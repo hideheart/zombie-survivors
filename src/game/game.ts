@@ -29,7 +29,7 @@ import { BossHazards } from './boss-hazards';
 import { BloodDecals } from './decals';
 import { Obstacle, resolveObstacles } from './obstacles';
 import { createRunState, rollChoices, xpForLevel, type RunState, type Upgrade } from './upgrades';
-import { levelUpBurst, bossDeathBurst, hurtBurst, enemyDeathBurst, spawnText } from './effects';
+import { levelUpBurst, bossDeathBurst, hurtBurst, enemyDeathBurst, spawnText, setGlowLayer } from './effects';
 import { sound } from './sound';
 
 export type GameState = 'running' | 'levelup' | 'dead' | 'paused' | 'won';
@@ -104,6 +104,7 @@ export interface GameHandle {
 export interface DebugParamView {
   label: string;
   group: string;
+  type: 'range' | 'bool';
   min: number;
   max: number;
   step: number;
@@ -120,6 +121,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
   /** 輝光層：讓發光材質（子彈、衛星、閃電、火花等）泛光更顯眼 */
   const glow = new GlowLayer('glow', scene);
   glow.intensity = 0.8;
+  setGlowLayer(glow);
   /** 線性霧增加遠處深度感 */
   scene.fogMode = Scene.FOGMODE_LINEAR;
   scene.fogColor = new Color3(0.05, 0.07, 0.13);
@@ -242,8 +244,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
   let grounded = true;
   let jumpRequested = false;
 
-  /** debug：經驗 ×10 */
+  /** debug：經驗 ×10、無敵、回力鏢視覺大小 */
   let xpDebug = false;
+  let invincible = false;
+  let boomerangScale = 1;
   function requestJump() {
     if (state === 'running') jumpRequested = true;
   }
@@ -326,7 +330,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       const existing = activeBuffs.find((b) => b.type === def.type);
       if (existing) existing.until = time + CONFIG.items.buffDuration / 1000;
       else activeBuffs.push({ type: def.type, until: time + CONFIG.items.buffDuration / 1000 });
-      spawnText(scene, pos, def.name, def.color, 10);
+      spawnText(scene, pos, def.name, def.color, 5);
       sound.buff();
     } else {
       const amount = run.maxHp * item.healPct;
@@ -547,7 +551,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     boss.update(dt, px, pz, obstacles, hazards);
     /** 王招式對玩家造成的傷害（彈幕／震波／毒池，無視騰空） */
     const hazardDmg = hazards.update(dt, px, pz, groundY);
-    if (hazardDmg > 0) hp -= hazardDmg;
+    if (hazardDmg > 0 && !invincible) hp -= hazardDmg;
 
     /** 道具：每 15 秒生成寶箱與回血，並更新拾取 */
     chestTimer += dt;
@@ -585,8 +589,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     const bossTouch = boss.contactsPlayer(px, pz, CONFIG.player.radius);
     /** 騰空時可躲開接觸傷害 */
     const hurt = (touching || bossTouch) && !airborne;
-    if (touching && !airborne) hp -= contactDps * dt;
-    if (bossTouch && !airborne) hp -= boss.contactDps * dt;
+    if (touching && !airborne && !invincible) hp -= contactDps * dt;
+    if (bossTouch && !airborne && !invincible) hp -= boss.contactDps * dt;
 
     /** 受擊回饋：間歇火花（含王招式傷害） */
     hurtTimer -= dt;
@@ -637,6 +641,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
   interface DebugParam {
     label: string;
     group: string;
+    type: 'range' | 'bool';
     min: number;
     max: number;
     step: number;
@@ -651,9 +656,20 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     step: number,
     get: () => number,
     set: (v: number) => void,
-  ): DebugParam => ({ group, label, min, max, step, get, set });
+  ): DebugParam => ({ group, label, type: 'range', min, max, step, get, set });
+  const boolParam = (group: string, label: string, get: () => boolean, set: (v: boolean) => void): DebugParam => ({
+    group,
+    label,
+    type: 'bool',
+    min: 0,
+    max: 1,
+    step: 1,
+    get: () => (get() ? 1 : 0),
+    set: (v) => set(v > 0.5),
+  });
 
   const debugSpec: DebugParam[] = [
+    boolParam('玩家', '無敵', () => invincible, (v) => (invincible = v)),
     cfgParam('玩家', '移動速度', 0, 40, 0.5, () => run.moveSpeed, (v) => (run.moveSpeed = v)),
     cfgParam('玩家', '生命上限', 10, 1000, 10, () => run.maxHp, (v) => (run.maxHp = v)),
     cfgParam('玩家', '接觸傷害/秒', 0, 100, 1, () => CONFIG.player.contactDps, (v) => (CONFIG.player.contactDps = v)),
@@ -676,6 +692,18 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     cfgParam('額外武器', '新星傷害', 0, 100, 1, () => run.novaDamage, (v) => (run.novaDamage = v)),
     cfgParam('額外武器', '回力鏢數', 0, 8, 1, () => run.boomerangCount, (v) => (run.boomerangCount = v)),
     cfgParam('額外武器', '回力鏢傷害', 0, 100, 1, () => run.boomerangDamage, (v) => (run.boomerangDamage = v)),
+    cfgParam(
+      '額外武器',
+      '長矛大小',
+      0.2,
+      6,
+      0.1,
+      () => boomerangScale,
+      (v) => {
+        boomerangScale = v;
+        extras.setBoomerangScale(v);
+      },
+    ),
 
     cfgParam('怪物', '數量上限', 0, 52, 1, () => CONFIG.director.maxCount, (v) => (CONFIG.director.maxCount = v)),
     cfgParam('怪物', '初始數量', 0, 52, 1, () => CONFIG.director.baseCount, (v) => (CONFIG.director.baseCount = v)),
@@ -772,6 +800,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       return debugSpec.map((p) => ({
         label: p.label,
         group: p.group,
+        type: p.type,
         min: p.min,
         max: p.max,
         step: p.step,

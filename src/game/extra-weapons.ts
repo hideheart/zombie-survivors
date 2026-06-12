@@ -58,6 +58,8 @@ export class ExtraWeapons {
 
   private boomerangTimer = 0;
   private boomerangReady = false;
+  /** 回力鏢視覺縮放（debug 可調） */
+  private boomerangScale = 1;
   /** 玩家所在地形高度（各效果貼地基準） */
   private baseY = 0;
   private boomerangs: {
@@ -179,10 +181,17 @@ export class ExtraWeapons {
         box.material = m;
         box.parent = holder;
       }
+      holder.scaling.setAll(this.boomerangScale);
       holder.setEnabled(false);
       this.boomerangs.push({ node: holder, active: false, t: 0, dirX: 0, dirZ: 1, bossHit: false, hit: new Set() });
     }
     this.boomerangReady = true;
+  }
+
+  /** 設定回力鏢視覺大小（debug） */
+  setBoomerangScale(s: number) {
+    this.boomerangScale = s;
+    for (const b of this.boomerangs) b.node.scaling.setAll(s);
   }
 
   /** 朝多方向丟出回力鏢 */

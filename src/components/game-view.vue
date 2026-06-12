@@ -42,19 +42,30 @@
       <template v-for="g in debugGroups" :key="g.group">
         <div class="mb-1 mt-2 text-sm font-black text-fuchsia-300">{{ g.group }}</div>
         <div v-for="item in g.items" :key="item.index" class="mb-2">
-          <div class="flex justify-between">
+          <label v-if="item.type === 'bool'" class="flex cursor-pointer items-center justify-between">
             <span>{{ item.label }}</span>
-            <span class="font-bold text-white/70">{{ fmt(item.value) }}</span>
-          </div>
-          <input
-            type="range"
-            class="w-full accent-fuchsia-400"
-            :min="item.min"
-            :max="item.max"
-            :step="item.step"
-            :value="item.value"
-            @input="onDebugInput(item.index, $event)"
-          />
+            <input
+              type="checkbox"
+              class="h-4 w-4 accent-fuchsia-400"
+              :checked="item.value > 0.5"
+              @change="onDebugToggle(item.index, $event)"
+            />
+          </label>
+          <template v-else>
+            <div class="flex justify-between">
+              <span>{{ item.label }}</span>
+              <span class="font-bold text-white/70">{{ fmt(item.value) }}</span>
+            </div>
+            <input
+              type="range"
+              class="w-full accent-fuchsia-400"
+              :min="item.min"
+              :max="item.max"
+              :step="item.step"
+              :value="item.value"
+              @input="onDebugInput(item.index, $event)"
+            />
+          </template>
         </div>
       </template>
     </div>
@@ -219,6 +230,11 @@ function onToggleDebug() {
 }
 function onDebugInput(index: number, e: Event) {
   const v = Number((e.target as HTMLInputElement).value);
+  if (debugParams.value[index]) debugParams.value[index].value = v;
+  game?.setDebugParam(index, v);
+}
+function onDebugToggle(index: number, e: Event) {
+  const v = (e.target as HTMLInputElement).checked ? 1 : 0;
   if (debugParams.value[index]) debugParams.value[index].value = v;
   game?.setDebugParam(index, v);
 }

@@ -62,6 +62,8 @@ export class GemSystem {
         this.px[i] = x;
         this.pz[i] = z;
         this.cursor = (i + 1) % CAPACITY;
+        /** 立即寫入矩陣，否則遠處（磁吸範圍外）的寶石會維持隱藏而看不見 */
+        this.writeMatrix(i);
         return;
       }
     }

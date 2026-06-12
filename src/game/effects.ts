@@ -8,9 +8,15 @@ import {
   MeshBuilder,
   StandardMaterial,
   Mesh,
+  GlowLayer,
 } from '@babylonjs/core';
 
 let glowTexture: DynamicTexture | undefined;
+/** 由 game 註冊；用來把飄字排除在泛光之外（避免文字被糊掉） */
+let glowLayer: GlowLayer | undefined;
+export function setGlowLayer(g: GlowLayer) {
+  glowLayer = g;
+}
 
 function getGlow(scene: Scene): DynamicTexture {
   if (glowTexture) return glowTexture;
@@ -118,6 +124,8 @@ export function spawnText(scene: Scene, pos: Vector3, text: string, colorHex: st
   material.disableLighting = true;
   material.backFaceCulling = false;
   plane.material = material;
+  /** 排除泛光，文字保持清晰 */
+  glowLayer?.addExcludedMesh(plane);
 
   const start = performance.now();
   const duration = 1100;
@@ -126,6 +134,7 @@ export function spawnText(scene: Scene, pos: Vector3, text: string, colorHex: st
     const progress = (performance.now() - start) / duration;
     if (progress >= 1) {
       scene.onBeforeRenderObservable.remove(observer);
+      glowLayer?.removeExcludedMesh(plane);
       plane.dispose();
       material.dispose();
       texture.dispose();
