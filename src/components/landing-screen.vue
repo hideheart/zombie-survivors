@@ -16,6 +16,16 @@
         </p>
       </div>
 
+      <!-- 暱稱 -->
+      <input
+        v-model="name"
+        maxlength="16"
+        placeholder="輸入暱稱（上排行榜用）"
+        class="w-full max-w-xs rounded-full bg-black/30 px-5 py-2 text-center font-bold text-white outline-none ring-1 ring-white/15 backdrop-blur-md placeholder:text-white/40"
+        @change="saveName"
+        @blur="saveName"
+      />
+
       <!-- 按鈕 -->
       <div class="flex w-full max-w-xs flex-col gap-4">
         <button class="portal-btn portal-btn--play" @click="emit('start')">▶ 遊戲開始</button>
@@ -43,9 +53,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import BackgroundPolygons from './background-polygons.vue';
-import { loadStats } from '../game/leaderboard';
+import { loadStats, getPlayerName, setPlayerName, type GlobalStats } from '../game/leaderboard';
+import { fetchStats } from '../game/api';
 
 const emit = defineEmits<{
   (e: 'start'): void;
@@ -53,7 +64,19 @@ const emit = defineEmits<{
   (e: 'bestiary'): void;
 }>();
 
-const stats = loadStats();
+const name = ref(getPlayerName());
+function saveName() {
+  setPlayerName(name.value);
+  name.value = getPlayerName();
+}
+
+/** 先顯示本機統計，抓到全球就覆蓋 */
+const stats = reactive<GlobalStats>(loadStats());
+onMounted(async () => {
+  const global = await fetchStats();
+  if (global) Object.assign(stats, global);
+});
+
 const timeText = computed(() => {
   const total = Math.floor(stats.totalTime);
   const h = Math.floor(total / 3600);

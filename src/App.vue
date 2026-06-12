@@ -36,7 +36,8 @@ import LeaderboardScreen from './components/leaderboard-screen.vue';
 import BestiaryScreen from './components/bestiary-screen.vue';
 import { loadMeta, saveMeta, computeStartRunState, goldMultiplier, PERMA, permaCost } from './game/meta';
 import { getCharacter } from './game/characters';
-import { addRecord, recordStats } from './game/leaderboard';
+import { addRecord, recordStats, getPlayerName } from './game/leaderboard';
+import { submitRun } from './game/api';
 import type { RunState } from './game/upgrades';
 import type { RunResult } from './game/game';
 
@@ -63,14 +64,28 @@ function onGameOver(result: RunResult) {
   meta.gold += result.gold;
   saveMeta(meta);
   recordStats(result.time, result.kills);
+  const playerName = getPlayerName();
+  const character = getCharacter(lastCharId).name;
+  /** 本機紀錄（離線/快取） */
   addRecord({
-    character: getCharacter(lastCharId).name,
+    name: playerName,
+    character,
     time: result.time,
     kills: result.kills,
     level: result.level,
     gold: result.gold,
     won: result.won,
     at: Date.now(),
+  });
+  /** 上傳全球（失敗則忽略） */
+  void submitRun({
+    name: playerName,
+    character,
+    time: result.time,
+    kills: result.kills,
+    level: result.level,
+    gold: result.gold,
+    won: result.won,
   });
 }
 

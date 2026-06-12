@@ -1,5 +1,7 @@
-/** 排行榜紀錄（存於 localStorage，依存活時間排序） */
+/** 排行榜紀錄（本機存於 localStorage，全球來自後端） */
 export interface RunRecord {
+  /** 玩家暱稱 */
+  name: string;
   character: string;
   time: number;
   kills: number;
@@ -8,6 +10,19 @@ export interface RunRecord {
   won: boolean;
   /** 紀錄時間（毫秒），由呼叫端帶入 */
   at: number;
+}
+
+const NAME_KEY = 'animal-survivors:name';
+/** 玩家暱稱（用於排行榜上榜） */
+export function getPlayerName(): string {
+  return localStorage.getItem(NAME_KEY) || '倖存者';
+}
+export function setPlayerName(name: string) {
+  try {
+    localStorage.setItem(NAME_KEY, name.trim().slice(0, 16) || '倖存者');
+  } catch {
+    /* 忽略寫入失敗 */
+  }
 }
 
 const KEY = 'animal-survivors:leaderboard:v1';

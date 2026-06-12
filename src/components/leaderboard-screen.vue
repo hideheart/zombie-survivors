@@ -11,6 +11,12 @@
           ← 返回
         </button>
         <h1 class="text-3xl font-black tracking-wider">🏆 排行榜</h1>
+        <span
+          class="rounded-full px-2 py-0.5 text-xs font-black"
+          :class="isGlobal ? 'bg-lime-400 text-black' : 'bg-white/15 text-white/70'"
+        >
+          {{ isGlobal ? '全球' : '本機' }}
+        </span>
       </div>
 
       <div v-if="records.length === 0" class="rounded-2xl bg-white/5 p-8 text-center text-white/60">
@@ -20,7 +26,7 @@
       <div v-else class="overflow-hidden rounded-2xl bg-black/40 backdrop-blur-md ring-1 ring-white/10">
         <div class="grid grid-cols-[2.5rem_1fr_4.5rem_3.5rem_3rem] gap-2 border-b border-white/10 px-4 py-2 text-xs font-black text-white/50">
           <span>#</span>
-          <span>角色</span>
+          <span>玩家</span>
           <span class="text-right">存活</span>
           <span class="text-right">擊殺</span>
           <span class="text-right">等級</span>
@@ -32,8 +38,9 @@
           :class="i % 2 ? 'bg-white/0' : 'bg-white/5'"
         >
           <span class="font-black" :class="rankClass(i)">{{ i + 1 }}</span>
-          <span class="font-bold">
-            {{ r.character }}
+          <span class="min-w-0 truncate font-bold">
+            {{ r.name || '玩家' }}
+            <span class="text-[0.66rem] font-normal text-white/45">{{ r.character }}</span>
             <span v-if="r.won" class="ml-1 rounded bg-amber-400/90 px-1 text-[0.6rem] font-black text-black">破關</span>
           </span>
           <span class="text-right font-mono">{{ timeText(r.time) }}</span>
@@ -46,13 +53,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import BackgroundPolygons from './background-polygons.vue';
 import { loadRecords } from '../game/leaderboard';
+import { fetchLeaderboard } from '../game/api';
 
 const emit = defineEmits<{ (e: 'back'): void }>();
 
+/** 先顯示本機紀錄，抓到全球榜就覆蓋 */
 const records = ref(loadRecords());
+const isGlobal = ref(false);
+onMounted(async () => {
+  const global = await fetchLeaderboard(10);
+  if (global) {
+    records.value = global;
+    isGlobal.value = true;
+  }
+});
 
 function timeText(t: number) {
   const total = Math.floor(t);
