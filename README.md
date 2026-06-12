@@ -25,6 +25,12 @@
 
 移動為**相機相對**（轉動視角後上下左右會跟著畫面走）。
 
+### 入口與頁面
+- **首頁入口**：末日風格落地頁（漂浮多邊形背景），三顆按鈕 — ▶ 遊戲開始／🏆 排行榜／🧟 怪物圖鑑，底部顯示本機累積統計（遊玩場次／時間／擊殺）。
+- **排行榜**：依存活時間記錄前 10 場（存 localStorage，每場結束自動記錄）。
+- **怪物圖鑑**：怪物 4 種＋王 5 隻的模型縮圖與說明。
+- **角色選擇**：6 個角色即時 3D 預覽（播 idle、自轉）＋ 詳細介紹；含永久強化商店。
+
 ---
 
 ## 🔫 武器與升級
@@ -67,10 +73,10 @@
 
 ## 🛠️ 技術
 - **Vue 3**（`<script setup>`）+ **TypeScript**
-- **Babylon.js 9** — 3D 場景、模型、粒子、輝光（GlowLayer）
+- **Babylon.js 9** — 3D 場景、模型、骨架動畫、粒子、輝光（GlowLayer）
 - **Vite 6** + **Tailwind CSS v4**
-- Web Audio 程式合成音效（零音檔）
-- 零後端，部署於 **Cloudflare Pages**
+- Web Audio 程式合成音效與背景音樂（零音檔）
+- 進度／排行榜／統計存於 localStorage；零後端，部署於 **Cloudflare Pages**
 
 ### 效能架構
 - 子彈／環境道具／地面以 **thin instances** 單一 draw call 繪製（SoA 型別陣列）。
@@ -105,14 +111,17 @@ src/
 │  ├─ boss.ts          # 5 隻王與招式狀態機
 │  ├─ boss-hazards.ts  # 王招式對玩家的傷害實體（彈幕/震波/毒池）
 │  ├─ upgrades.ts      # RunState 與升級表
-│  ├─ characters.ts / meta.ts  # 角色與 roguelite meta（金幣/解鎖/永久強化）
-│  ├─ effects.ts / sound.ts / decals.ts  # 粒子、音效、血跡
+│  ├─ characters.ts / meta.ts / leaderboard.ts  # 角色、roguelite meta、排行榜/統計
+│  ├─ terrain.ts / ground-decals.ts      # 地面（柏油材質）、馬路與地面貼片
+│  ├─ effects.ts / sound.ts / decals.ts  # 粒子、音效+背景音樂、血跡
 │  ├─ spatial-grid.ts / obstacles.ts     # 空間網格、障礙碰撞
+│  ├─ character-previews.ts / model-thumbs.ts  # 選單即時預覽 / 圖鑑縮圖
 │  └─ model-loader.ts / gem-system.ts / input.ts / config.ts
-├─ components/         # menu / hud / game-view / joystick / 各 modal
+├─ components/         # landing / leaderboard / bestiary / menu / hud / game-view / 各 modal
 └─ App.vue
 public/models/zombie/  # GLB/glTF 模型（角色、殭屍、武器、道具）
 ```
+頁面流程：`landing`（入口）→ `menu`（角色選擇）→ `game`；另有 `leaderboard`、`bestiary` 分頁。
 
 ## 🎨 素材
 3D 模型取自第三方低面數模型包（角色、殭屍、武器、場景道具），實際使用的檔案放在 `public/models/zombie/`。原始素材包置於 `download/`，已 gitignore、不納入版控。
