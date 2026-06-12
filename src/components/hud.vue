@@ -44,7 +44,7 @@
     <!-- 王血條 -->
     <div
       v-if="stats.bossActive"
-      class="absolute left-1/2 top-24 w-[min(92vw,32rem)] -translate-x-1/2 text-center text-white sm:top-4 sm:w-[min(80vw,32rem)]"
+      class="absolute left-1/2 top-32 w-[min(92vw,32rem)] -translate-x-1/2 text-center text-white sm:top-4 sm:w-[min(80vw,32rem)]"
     >
       <div class="mb-1 text-xs font-black tracking-widest text-rose-300 sm:text-sm">
         ⚠ {{ stats.bossName }} ⚠
