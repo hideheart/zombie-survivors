@@ -1,4 +1,4 @@
-import { Scene, Mesh, MeshBuilder, StandardMaterial, Color3, TransformNode, Vector3 } from '@babylonjs/core';
+import { Scene, Mesh, MeshBuilder, StandardMaterial, Color3, TransformNode, Vector3, AbstractMesh } from '@babylonjs/core';
 import { CONFIG } from './config';
 import { loadModel } from './model-loader';
 import { Obstacle, resolveObstacles } from './obstacles';
@@ -83,6 +83,10 @@ const BOSS_DEFS: BossDef[] = [
 /** 王的總數（打完即破關） */
 export const BOSS_COUNT = BOSS_DEFS.length;
 
+/** 受擊白光持續時間（秒） */
+const FLASH_DUR = 0.16;
+const WHITE = new Color3(1, 1, 1);
+
 /**
  * 王：依序登場的 5 隻巨型殭屍，各有特殊招式。
  * 5 種模型於建構時預先載入，spawn 時啟用對應的一隻。
@@ -105,8 +109,12 @@ export class Boss {
   private root: TransformNode;
   private fallback: Mesh;
   private models: (TransformNode | null)[];
+  /** 各王模型的實際網格（白光 overlay 用） */
+  private modelMeshes: AbstractMesh[][];
+  /** 目前顯示中的網格 */
+  private currentMeshes: AbstractMesh[] = [];
   private readonly resolved = { x: 0, z: 0 };
-  /** 受擊縮放回饋計時 */
+  /** 受擊白光計時 */
   private hitFlash = 0;
 
   private skill: BossSkill = 'charge';
@@ -132,17 +140,27 @@ export class Boss {
     material.emissiveColor = new Color3(0.2, 0.4, 0.15);
     material.specularColor = Color3.Black();
     this.fallback.material = material;
+    this.fallback.overlayColor = WHITE;
+    this.fallback.renderOverlay = false;
+    this.currentMeshes = [this.fallback];
 
     this.root.setEnabled(false);
 
     /** 預先載入 5 隻王的模型，各自正規化大小並停用 */
     this.models = new Array(BOSS_DEFS.length).fill(null);
+    this.modelMeshes = new Array(BOSS_DEFS.length).fill(null).map(() => []);
     BOSS_DEFS.forEach((def, i) => {
       void loadModel(scene, def.model, def.radius * 2.2, true).then((node) => {
         if (!node) return;
         node.parent = this.root;
         node.setEnabled(false);
         this.models[i] = node;
+        const ms = node.getChildMeshes(false);
+        for (const m of ms) {
+          m.overlayColor = WHITE;
+          m.renderOverlay = false;
+        }
+        this.modelMeshes[i] = ms;
       });
     });
   }
@@ -181,6 +199,10 @@ export class Boss {
     this.fallback.scaling.set(this.radius, this.radius, this.radius);
     this.fallback.position.y = this.radius;
 
+    /** 白光 overlay 套用對象：目前顯示中的網格 */
+    this.currentMeshes = hasModel && this.modelMeshes[index].length ? this.modelMeshes[index] : [this.fallback];
+    for (const m of this.currentMeshes) m.renderOverlay = false;
+
     this.root.position.set(this.x, 0, this.z);
     this.root.setEnabled(true);
   }
@@ -199,10 +221,17 @@ export class Boss {
       }
     }
 
-    /** 受擊縮放彈跳回饋 */
-    if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt);
-    const punch = 1 + (this.hitFlash / 0.12) * 0.08;
-    this.root.scaling.set(punch, punch, punch);
+    /** 受擊白光回饋 */
+    if (this.hitFlash > 0) {
+      this.hitFlash = Math.max(0, this.hitFlash - dt);
+      const a = (this.hitFlash / FLASH_DUR) * 0.9;
+      for (const m of this.currentMeshes) {
+        m.renderOverlay = true;
+        m.overlayAlpha = a;
+      }
+    } else if (this.currentMeshes.length && this.currentMeshes[0].renderOverlay) {
+      for (const m of this.currentMeshes) m.renderOverlay = false;
+    }
   }
 
   /** 朝目標移動一步，套用障礙物阻擋並面向移動方向 */
@@ -279,8 +308,8 @@ export class Boss {
     const r = this.radius + hitRadius;
     if (dx * dx + dz * dz > r * r) return false;
     this.hp -= amount;
-    /** 受擊回饋：火花 + 縮放彈跳 */
-    this.hitFlash = 0.12;
+    /** 受擊回饋：火花 + 白光 */
+    this.hitFlash = FLASH_DUR;
     hitSpark(this.scene, new Vector3(px, this.radius * 0.7, pz));
     if (this.hp <= 0) {
       this.active = false;

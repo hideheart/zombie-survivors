@@ -11,6 +11,9 @@ import {
   Vector3,
   TransformNode,
   Mesh,
+  GlowLayer,
+  DynamicTexture,
+  Texture,
 } from '@babylonjs/core';
 import { loadModel, loadCharacter } from './model-loader';
 import type { AnimationGroup } from '@babylonjs/core';
@@ -95,11 +98,14 @@ export interface GameHandle {
 }
 
 export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {}): GameHandle {
-  const engine = new Engine(canvas, true, { preserveDrawingBuffer: false, stencil: false });
+  const engine = new Engine(canvas, true, { preserveDrawingBuffer: false, stencil: true });
   sound.enable();
 
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.05, 0.07, 0.13, 1);
+  /** 輝光層：讓發光材質（子彈、衛星、閃電、火花等）泛光更顯眼 */
+  const glow = new GlowLayer('glow', scene);
+  glow.intensity = 0.8;
   /** 線性霧增加遠處深度感 */
   scene.fogMode = Scene.FOGMODE_LINEAR;
   scene.fogColor = new Color3(0.05, 0.07, 0.13);
@@ -182,6 +188,13 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
   void loadModel(scene, '/models/zombie/item_chest.gltf', 1.1).then((n) => {
     if (n) {
       n.setEnabled(false);
+      /** 套上自發光材質，讓 GlowLayer 泛光（金色） */
+      const chestMat = new StandardMaterial('chest-glow', scene);
+      chestMat.diffuseColor = new Color3(1, 0.8, 0.3);
+      chestMat.emissiveColor = new Color3(1, 0.7, 0.2);
+      chestMat.specularColor = Color3.Black();
+      chestMat.disableLighting = true;
+      n.getChildMeshes(false).forEach((m) => (m.material = chestMat));
       chestTemplate = n;
     }
   });
@@ -615,8 +628,9 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       if (!upgrade) return;
       upgrade.apply(run);
       levels[upgrade.id] = (levels[upgrade.id] ?? 0) + 1;
+      /** 最大生命升級補滿，其餘升級回復 30% 最大生命 */
       if (upgrade.id === 'maxhp') hp = run.maxHp;
-      else hp = Math.min(hp, run.maxHp);
+      else hp = Math.min(run.maxHp, hp + run.maxHp * 0.3);
       choices = [];
       state = 'running';
       pushStats();
@@ -709,8 +723,76 @@ function createHealMesh(scene: Scene): Mesh {
 function createGround(scene: Scene) {
   const size = CONFIG.arenaHalf * 2.4;
   const ground = MeshBuilder.CreateGround('ground', { width: size, height: size }, scene);
+
+  /** 程序生成末日柏油路面：深色底 + 石板接縫 + 顆粒 + 裂縫 + 血漬 + 黃線 */
+  const px = 512;
+  const tex = new DynamicTexture('ground-tex', px, scene, false);
+  const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
+
+  /** 底色（偏暗） */
+  ctx.fillStyle = '#262d39';
+  ctx.fillRect(0, 0, px, px);
+
+  /** 顆粒雜訊 */
+  for (let i = 0; i < 4000; i++) {
+    const x = Math.random() * px;
+    const y = Math.random() * px;
+    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.07)';
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  /** 石板接縫 */
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(0, 0, px, px);
+  ctx.strokeStyle = 'rgba(150,160,180,0.10)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(6, 6, px - 12, px - 12);
+
+  /** 裂縫：數條鋸齒暗線 */
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  for (let k = 0; k < 4; k++) {
+    let x = Math.random() * px;
+    let y = Math.random() * px;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    for (let s = 0; s < 6; s++) {
+      x += (Math.random() - 0.5) * 140;
+      y += (Math.random() - 0.5) * 140;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineWidth = 1 + Math.random() * 2;
+    ctx.stroke();
+  }
+
+  /** 血漬：暗紅放射狀殘留 */
+  for (let k = 0; k < 3; k++) {
+    const bx = Math.random() * px;
+    const by = Math.random() * px;
+    const r = 24 + Math.random() * 50;
+    const g = ctx.createRadialGradient(bx, by, 0, bx, by, r);
+    g.addColorStop(0, 'rgba(85,12,12,0.6)');
+    g.addColorStop(1, 'rgba(85,12,12,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /** 褪色黃漆痕（路面標線殘跡） */
+  ctx.fillStyle = 'rgba(200,180,45,0.22)';
+  for (let k = 0; k < 4; k++) {
+    ctx.fillRect(Math.random() * px, Math.random() * px, 22 + Math.random() * 26, 5);
+  }
+
+  tex.update();
+  tex.wrapU = Texture.WRAP_ADDRESSMODE;
+  tex.wrapV = Texture.WRAP_ADDRESSMODE;
+  tex.uScale = 12;
+  tex.vScale = 12;
+
   const material = new StandardMaterial('ground-material', scene);
-  material.diffuseColor = new Color3(0.16, 0.22, 0.32);
+  material.diffuseTexture = tex;
   material.specularColor = Color3.Black();
   ground.material = material;
   return ground;

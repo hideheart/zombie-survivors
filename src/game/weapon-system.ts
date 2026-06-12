@@ -60,7 +60,7 @@ export class WeaponSystem {
     this.matrixBuffer = new Float32Array(this.cap * 16);
 
     /** 子彈 fallback：發光黃色小球（飛刀模型載入後替換） */
-    const base = MeshBuilder.CreateSphere('bullet', { diameter: 0.45, segments: 6 }, scene);
+    const base = MeshBuilder.CreateSphere('bullet', { diameter: 0.6, segments: 8 }, scene);
     const material = new StandardMaterial('bullet-material', scene);
     material.diffuseColor = new Color3(1, 0.9, 0.4);
     material.emissiveColor = new Color3(1, 0.7, 0.1);
@@ -86,11 +86,18 @@ export class WeaponSystem {
       const merged = Mesh.MergeMeshes(parts, true, true, undefined, false, true);
       res.meshes[0]?.dispose();
       if (!merged) return;
-      /** 依最長邊正規化大小 */
+      /** 依最長邊正規化大小（放大一點更顯眼） */
       const { min, max } = merged.getHierarchyBoundingVectors();
       const size = Math.max(max.x - min.x, max.y - min.y, max.z - min.z) || 1;
-      const s = 1.2 / size;
+      const s = 1.9 / size;
       this.scaleActive.set(s, s, s);
+      /** 覆蓋為高亮發光材質（搭配 GlowLayer 泛光） */
+      const glowMat = new StandardMaterial('knife-glow', scene);
+      glowMat.diffuseColor = new Color3(1, 0.95, 0.5);
+      glowMat.emissiveColor = new Color3(1, 0.8, 0.2);
+      glowMat.specularColor = Color3.Black();
+      glowMat.disableLighting = true;
+      merged.material = glowMat;
       merged.isPickable = false;
       merged.alwaysSelectAsActiveMesh = true;
       merged.thinInstanceSetBuffer('matrix', this.matrixBuffer, 16, false);

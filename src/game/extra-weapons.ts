@@ -113,15 +113,22 @@ export class ExtraWeapons {
 
   /** 以斧頭模型替換球體 orb（各自包 holder 以便旋轉） */
   private async loadOrbWeapon(scene: Scene) {
-    const tmpl = await loadModel(scene, '/models/zombie/weapon_axe.gltf', 1.5);
+    const tmpl = await loadModel(scene, '/models/zombie/weapon_axe.gltf', 0.2);
     if (!tmpl) return;
     tmpl.setEnabled(false);
+    /** 套上自發光材質，讓 GlowLayer 泛光（橘紅） */
+    const axeMat = new StandardMaterial('axe-glow', scene);
+    axeMat.diffuseColor = new Color3(1, 0.6, 0.25);
+    axeMat.emissiveColor = new Color3(1, 0.5, 0.15);
+    axeMat.specularColor = Color3.Black();
+    axeMat.disableLighting = true;
+    tmpl.getChildMeshes(false).forEach((m) => (m.material = axeMat));
     for (let i = 0; i < MAX_ORBS; i++) {
       const vis = i === 0 ? tmpl : tmpl.clone(`orb-axe-${i}`, null);
       if (!vis) continue;
       const holder = new TransformNode(`orb-h-${i}`, scene);
       vis.parent = holder;
-      vis.position.y = -0.75; // 讓斧頭以 holder 為中心
+      vis.position.y = -0.1; // 讓斧頭以 holder 為中心
       vis.setEnabled(true);
       const wasEnabled = this.orbs[i].isEnabled();
       this.orbs[i].dispose();
@@ -132,14 +139,23 @@ export class ExtraWeapons {
 
   /** 載入長矛模型，建立回力鏢池（載入失敗則用方塊） */
   private async loadBoomerangs(scene: Scene) {
-    const tmpl = await loadModel(scene, '/models/zombie/weapon_spear.gltf', 1.8);
+    const tmpl = await loadModel(scene, '/models/zombie/weapon_spear.gltf', 0.3);
+    if (tmpl) {
+      /** 套上自發光材質，讓 GlowLayer 泛光（青藍） */
+      const spearMat = new StandardMaterial('spear-glow', scene);
+      spearMat.diffuseColor = new Color3(0.5, 0.9, 1);
+      spearMat.emissiveColor = new Color3(0.3, 0.8, 1);
+      spearMat.specularColor = Color3.Black();
+      spearMat.disableLighting = true;
+      tmpl.getChildMeshes(false).forEach((m) => (m.material = spearMat));
+    }
     for (let i = 0; i < MAX_BOOMERANGS; i++) {
       const holder = new TransformNode(`boomerang-${i}`, scene);
       if (tmpl) {
         const vis = i === 0 ? tmpl : tmpl.clone(`spear-${i}`, null);
         if (vis) {
           vis.parent = holder;
-          vis.position.y = -0.9;
+          vis.position.y = -0.15;
           vis.rotation.z = Math.PI / 2; // 長矛橫躺旋轉
           vis.setEnabled(true);
         }

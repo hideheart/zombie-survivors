@@ -1,4 +1,4 @@
-import { Scene, TransformNode, SceneLoader, AnimationGroup } from '@babylonjs/core';
+import { Scene, TransformNode, SceneLoader, AnimationGroup, AbstractMesh, Color3 } from '@babylonjs/core';
 import '@babylonjs/loaders';
 import { CONFIG } from './config';
 import { SpatialGrid } from './spatial-grid';
@@ -22,11 +22,16 @@ const ZOMBIE_TYPES: ZombieType[] = [
 const BASE_HEIGHT = 2.4;
 /** 每種類型預先 instantiate 的數量（總和為怪海上限） */
 const PER_TYPE = 13;
+/** 受擊白光持續時間（秒） */
+const FLASH_DUR = 0.16;
+const WHITE = new Color3(1, 1, 1);
 
 interface Entry {
   root: TransformNode;
   anim?: AnimationGroup;
   baseSpeed: number;
+  /** 實際渲染的網格，用於受擊白光 overlay */
+  meshes: AbstractMesh[];
 }
 
 /**
@@ -45,6 +50,8 @@ export class ZombieHorde {
   private posX: Float32Array;
   private posZ: Float32Array;
   private hp: Float32Array;
+  /** 受擊回饋計時（>0 時縮放彈跳） */
+  private hitFlash: Float32Array;
   private capacity = ZOMBIE_TYPES.length * PER_TYPE;
 
   constructor(scene: Scene) {
@@ -52,6 +59,7 @@ export class ZombieHorde {
     this.posX = new Float32Array(this.capacity);
     this.posZ = new Float32Array(this.capacity);
     this.hp = new Float32Array(this.capacity);
+    this.hitFlash = new Float32Array(this.capacity);
     void this.init();
   }
 
@@ -83,7 +91,15 @@ export class ZombieHorde {
           inst.animationGroups.find((a) => /idle/i.test(a.name)) ??
           inst.animationGroups[0];
 
-        this.pool.push({ root: holder, anim, baseSpeed: t.speed });
+        /** 取出實際網格，預設關閉白光 overlay */
+        const meshes = modelRoot.getChildMeshes(false);
+        for (const m of meshes) {
+          m.overlayColor = WHITE;
+          m.overlayAlpha = 0;
+          m.renderOverlay = false;
+        }
+
+        this.pool.push({ root: holder, anim, baseSpeed: t.speed, meshes });
       }
     }
 
@@ -109,6 +125,8 @@ export class ZombieHorde {
     this.posZ[i] = playerZ + Math.sin(angle) * dist;
     /** 依 index 對應的類型血量（pool 交錯排列） */
     this.hp[i] = ZOMBIE_TYPES[i % ZOMBIE_TYPES.length].hp * this.hpMul;
+    this.hitFlash[i] = 0;
+    for (const m of entry.meshes) m.renderOverlay = false;
     entry.root.position.x = this.posX[i];
     entry.root.position.z = this.posZ[i];
     entry.root.setEnabled(true);
@@ -158,6 +176,8 @@ export class ZombieHorde {
   damage(i: number, amount: number, playerX: number, playerZ: number): boolean {
     if (i >= this.count) return false;
     this.hp[i] -= amount;
+    /** 被扣血即觸發受擊白光 */
+    this.hitFlash[i] = FLASH_DUR;
     if (this.hp[i] <= 0) {
       this.spawn(i, playerX, playerZ);
       return true;
@@ -220,6 +240,19 @@ export class ZombieHorde {
       root.position.z = nz;
       /** 面向玩家（模型前方 +Z） */
       root.rotation.y = Math.atan2(dirX, dirZ);
+
+      /** 受擊白光回饋：整隻殭屍閃白（per-mesh overlay，不影響其他殭屍） */
+      const meshes = this.pool[i].meshes;
+      if (this.hitFlash[i] > 0) {
+        this.hitFlash[i] = Math.max(0, this.hitFlash[i] - dt);
+        const a = (this.hitFlash[i] / FLASH_DUR) * 0.9;
+        for (let m = 0; m < meshes.length; m++) {
+          meshes[m].renderOverlay = true;
+          meshes[m].overlayAlpha = a;
+        }
+      } else if (meshes.length > 0 && meshes[0].renderOverlay) {
+        for (let m = 0; m < meshes.length; m++) meshes[m].renderOverlay = false;
+      }
     }
   }
 }

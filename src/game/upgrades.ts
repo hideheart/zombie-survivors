@@ -83,7 +83,7 @@ export const UPGRADES: Upgrade[] = [
     name: '環繞衛星',
     desc: '召喚環繞身邊的能量球，碰撞傷害敵人；已有則 +1 顆並擴大環繞範圍',
     emoji: '🛰️',
-    maxLevel: 6,
+    maxLevel: 10,
     apply: (s) => {
       s.orbitalCount += 1;
       s.orbitalDamage += 1;
@@ -95,7 +95,7 @@ export const UPGRADES: Upgrade[] = [
     name: '傷害光環',
     desc: '展開持續傷害光環，自動灼燒靠近的敵人；已有則擴大並增傷',
     emoji: '🌀',
-    maxLevel: 6,
+    maxLevel: 10,
     apply: (s) => {
       s.auraRadius = s.auraRadius === 0 ? 4 : s.auraRadius + 0.8;
       s.auraDamage += 1;
@@ -106,7 +106,7 @@ export const UPGRADES: Upgrade[] = [
     name: '連鎖閃電',
     desc: '定期電擊最近的敵人並向周圍連鎖；已有則 +1 連鎖數並增傷',
     emoji: '⚡',
-    maxLevel: 5,
+    maxLevel: 10,
     apply: (s) => {
       s.lightningCount += 1;
       s.lightningDamage += 1;
@@ -117,7 +117,7 @@ export const UPGRADES: Upgrade[] = [
     name: '新星爆',
     desc: '定期釋放向外擴張的衝擊波，炸傷周圍所有敵人；已有則擴大並增傷',
     emoji: '💥',
-    maxLevel: 5,
+    maxLevel: 10,
     apply: (s) => {
       s.novaRadius = s.novaRadius === 0 ? 6 : s.novaRadius + 1;
       s.novaDamage += 2;
@@ -128,7 +128,7 @@ export const UPGRADES: Upgrade[] = [
     name: '回力鏢',
     desc: '定期丟出長矛飛出再飛回，沿途貫穿傷害敵人；已有則 +1 支並增傷',
     emoji: '🪃',
-    maxLevel: 5,
+    maxLevel: 10,
     apply: (s) => {
       s.boomerangCount += 1;
       s.boomerangDamage += 1;

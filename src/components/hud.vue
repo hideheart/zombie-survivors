@@ -16,11 +16,14 @@
       </div>
 
       <!-- 血量 -->
-      <div class="h-4 w-56 overflow-hidden rounded-full bg-black/40 backdrop-blur-md">
+      <div class="relative h-5 w-56 overflow-hidden rounded-full bg-black/40 backdrop-blur-md">
         <div
           class="h-full rounded-full bg-gradient-to-r from-red-500 to-rose-400 transition-[width] duration-100"
           :style="{ width: hpPercent + '%' }"
         />
+        <div class="absolute inset-0 flex items-center justify-center text-xs font-black text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.9)]">
+          {{ stats.hp }} / {{ stats.maxHp }}
+        </div>
       </div>
 
       <!-- 等級與經驗 -->
