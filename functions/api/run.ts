@@ -15,6 +15,8 @@ export const onRequestPost = async ({ request, env }: FnContext): Promise<Respon
   const level = clampInt(body.level, 1, 999);
   const gold = clampInt(body.gold, 0, 1_000_000);
   const won = body.won ? 1 : 0;
+  /** 反作弊：7 隻王每 30 秒依序登場，最快也要約 210 秒才可能全破；低於此判定為偽造，拒收 */
+  if (won && time < 200) return json({ error: 'implausible clear time' }, 400);
   const name = sanitizeText(body.name, 16) || '倖存者';
   const character = sanitizeText(body.character, 16) || '?';
   const difficulty = sanitizeText(body.difficulty, 16) || 'easy';
