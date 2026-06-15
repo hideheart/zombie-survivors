@@ -12,6 +12,14 @@ export const onRequestPost = async ({ request, env }: FnContext): Promise<Respon
     )
       .bind(id, now, now)
       .run();
+    /** 順手記錄同時在線最高：算近 90 秒人數，超過歷史峰值才更新（條件式 UPDATE 避免 race） */
+    const row = await env.DB.prepare('SELECT COUNT(*) AS n FROM presence WHERE last_seen > ?')
+      .bind(now - 90000)
+      .first<{ n: number }>();
+    const n = row?.n ?? 0;
+    await env.DB.prepare('UPDATE stats SET peak_online = ?, peak_online_at = ? WHERE id = 1 AND peak_online < ?')
+      .bind(n, now, n)
+      .run();
     return json({ ok: true });
   } catch {
     return json({ ok: false }, 500);

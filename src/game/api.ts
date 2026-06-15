@@ -68,13 +68,13 @@ export async function sendHeartbeat(): Promise<void> {
   }
 }
 
-/** 取目前線上遊玩人數；失敗回傳 null */
-export async function fetchOnline(): Promise<number | null> {
+/** 取目前線上遊玩人數 + 同時在線歷史最高；失敗回傳 null */
+export async function fetchOnline(): Promise<{ online: number; peak: number } | null> {
   try {
     const res = await fetch(`${BASE}/online`);
     if (!res.ok) return null;
-    const data = (await res.json()) as { online: number };
-    return data.online ?? 0;
+    const data = (await res.json()) as { online: number; peak: number };
+    return { online: data.online ?? 0, peak: data.peak ?? 0 };
   } catch {
     return null;
   }

@@ -21,7 +21,9 @@ CREATE TABLE IF NOT EXISTS stats (
   id INTEGER PRIMARY KEY,
   plays INTEGER NOT NULL DEFAULT 0,
   total_time REAL NOT NULL DEFAULT 0,
-  total_kills INTEGER NOT NULL DEFAULT 0
+  total_kills INTEGER NOT NULL DEFAULT 0,
+  peak_online INTEGER NOT NULL DEFAULT 0,
+  peak_online_at INTEGER NOT NULL DEFAULT 0
 );
 INSERT OR IGNORE INTO stats (id, plays, total_time, total_kills) VALUES (1, 0, 0, 0);
 

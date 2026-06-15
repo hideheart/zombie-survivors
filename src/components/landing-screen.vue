@@ -25,6 +25,8 @@
           </span>
           <span class="text-lime-300">{{ online }}</span>
           <span class="text-white/60">人正在遊玩</span>
+          <span v-if="peak > 0" class="text-white/35">·</span>
+          <span v-if="peak > 0" class="text-white/45">最高 {{ peak }}</span>
         </div>
       </div>
 
@@ -104,12 +106,16 @@ function onStart() {
 /** 先顯示本機統計，抓到全球就覆蓋 */
 const stats = reactive<GlobalStats>(loadStats());
 
-/** 目前遊玩人數（每 60 秒輪詢；失敗則維持上次值/隱藏） */
+/** 目前遊玩人數 + 同時在線最高（每 60 秒輪詢；失敗則維持上次值/隱藏） */
 const online = ref<number | null>(null);
+const peak = ref(0);
 let onlineTimer: number | undefined;
 async function refreshOnline() {
-  const n = await fetchOnline();
-  if (n !== null) online.value = n;
+  const data = await fetchOnline();
+  if (data !== null) {
+    online.value = data.online;
+    peak.value = data.peak;
+  }
 }
 
 onMounted(async () => {
