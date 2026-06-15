@@ -305,6 +305,9 @@ function onToggleDebug() {
       window.alert('答錯了，無法開啟 Debug');
       return;
     }
+    /** 開啟 Debug 即視為作弊，本局不列入排行榜（先讓玩家確認） */
+    if (!window.confirm('開啟 Debug 面板後，本局成績將不列入排行榜。確定開啟？')) return;
+    game?.markCheated();
   }
   showDebug.value = !showDebug.value;
   if (showDebug.value && game) {

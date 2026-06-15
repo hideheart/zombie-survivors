@@ -76,6 +76,8 @@ export interface RunResult {
   level: number;
   /** 是否破關（擊敗最終王） */
   won: boolean;
+  /** 本局是否動過 debug（true 則不列入排行榜） */
+  cheated: boolean;
 }
 
 export interface GameOptions {
@@ -112,6 +114,8 @@ export interface GameHandle {
   getUpgradeStatus: () => UpgradeStatusView[];
   getBossNames: () => string[];
   summonBoss: (index: number) => void;
+  /** 標記本局動過 debug（開啟 debug 面板時呼叫）→ 不列入排行榜 */
+  markCheated: () => void;
 }
 
 export interface UpgradeStatusView {
@@ -305,6 +309,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
 
   /** debug：經驗 ×10、無敵、回力鏢視覺大小 */
   let xpDebug = false;
+  /** 本局是否動過 debug（開面板/改參數/無敵/EXP×10/召喚王）→ 結算不列入排行榜 */
+  let cheated = false;
   let invincible = false;
   let boomerangScale = 1;
   /** 護盾狀態 */
@@ -632,7 +638,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
         sound.levelUp();
         hazards.reset();
         pushStats();
-        options.onGameOver?.({ gold: goldEarned, kills, time, level, won: true });
+        options.onGameOver?.({ gold: goldEarned, kills, time, level, won: true, cheated });
         return;
       }
     }
@@ -736,7 +742,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       state = 'dead';
       sound.playerDeath();
       pushStats();
-      options.onGameOver?.({ gold: goldEarned, kills, time, level, won: false });
+      options.onGameOver?.({ gold: goldEarned, kills, time, level, won: false, cheated });
     }
 
     time += dt;
@@ -928,6 +934,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     },
     setXpDebug(on: boolean) {
       xpDebug = on;
+      if (on) cheated = true;
+    },
+    markCheated() {
+      cheated = true;
     },
     setMuted(on: boolean) {
       sound.setMuted(on);
@@ -957,6 +967,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     },
     setDebugParam(index: number, value: number) {
       debugSpec[index]?.set(value);
+      cheated = true;
     },
     getUpgradeStatus() {
       return UPGRADES.map((u) => ({
@@ -973,6 +984,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       if (index < 0 || index >= BOSS_COUNT) return;
       boss.spawn(index, player.position.x, player.position.z);
       bossTimer = 0;
+      cheated = true;
     },
   };
 }
