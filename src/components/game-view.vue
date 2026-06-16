@@ -4,6 +4,25 @@
 
     <hud :stats="stats" />
 
+    <!-- 死鬥：連殺數（左上角，受擊歸零） -->
+    <div
+      v-if="stats.mode === 'deathmatch' && stats.combo >= 5 && stats.state === 'running'"
+      class="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 text-center font-black text-amber-300 drop-shadow-[0_2px_0_rgba(0,0,0,0.5)]"
+    >
+      <span class="text-2xl sm:text-3xl">{{ stats.combo }}</span>
+      <span class="ml-1 text-sm">連殺</span>
+    </div>
+
+    <!-- 死鬥：波數字卡（進新波時短暫顯示） -->
+    <div
+      v-if="stats.waveCard && stats.state === 'running'"
+      class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
+    >
+      <div class="wave-card text-5xl font-black tracking-widest text-lime-300 sm:text-7xl" style="-webkit-text-stroke: 4px #14210f; paint-order: stroke fill">
+        {{ stats.waveCard }}
+      </div>
+    </div>
+
     <!-- 右上控制：靜音／暫停／技能等級／Debug -->
     <div v-show="stats.state === 'running'" class="absolute right-3 top-3 z-10 flex items-center gap-1.5 sm:right-4 sm:top-4 sm:gap-2">
       <button
@@ -163,6 +182,7 @@ import {
   type RunResult,
   type DebugParamView,
   type UpgradeStatusView,
+  type GameMode,
 } from '../game/game';
 import { sendHeartbeat } from '../game/api';
 import { QUALITIES, type QualityId } from '../game/quality';
@@ -181,6 +201,7 @@ const props = defineProps<{
   startRunState?: RunState;
   goldMultiplier: number;
   difficulty?: Difficulty;
+  mode?: GameMode;
 }>();
 const emit = defineEmits<{
   (e: 'gameover', result: RunResult): void;
@@ -209,6 +230,10 @@ const stats = reactive<GameStats>({
   bossTotal: 5,
   goldEarned: 0,
   musicTrack: 0,
+  mode: 'story',
+  wave: 0,
+  combo: 0,
+  waveCard: '',
 });
 
 let game: GameHandle | undefined;
@@ -246,6 +271,7 @@ onMounted(() => {
     goldMultiplier: props.goldMultiplier,
     difficulty: props.difficulty,
     quality: quality.value,
+    mode: props.mode,
     onStats: (s) => {
       Object.assign(stats, s);
       if (showStats.value && game) upgradeStatus.value = game.getUpgradeStatus();
@@ -332,3 +358,16 @@ function fmt(v: number) {
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
 </script>
+
+<style scoped>
+.wave-card {
+  animation: wave-pop 1.6s ease-out forwards;
+}
+@keyframes wave-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  15% { transform: scale(1.1); opacity: 1; }
+  30% { transform: scale(1); opacity: 1; }
+  75% { opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+</style>

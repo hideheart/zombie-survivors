@@ -14,6 +14,12 @@
         <span class="rounded-xl bg-black/40 px-2 py-1 backdrop-blur-md sm:px-3">敵人 {{ stats.enemies }}</span>
         <span class="rounded-xl bg-black/40 px-2 py-1 backdrop-blur-md sm:px-3">擊殺 {{ stats.kills }}</span>
         <span class="rounded-xl bg-black/40 px-2 py-1 backdrop-blur-md sm:px-3">時間 {{ timeText }}</span>
+        <span
+          v-if="stats.mode === 'deathmatch'"
+          class="rounded-xl bg-rose-500/80 px-2 py-1 font-black backdrop-blur-md sm:px-3"
+        >
+          第 {{ stats.wave }} 波
+        </span>
       </div>
 
       <!-- 血量 -->
@@ -49,7 +55,7 @@
       <div class="mb-1 text-xs font-black tracking-widest text-rose-300 sm:text-sm">
         ⚠ {{ stats.bossName }} ⚠
         <span class="ml-1 text-amber-300/90">[{{ stats.bossSkill }}]</span>
-        <span class="ml-1 text-white/60">{{ stats.bossDefeated + 1 }}/{{ stats.bossTotal }}</span>
+        <span v-if="stats.mode !== 'deathmatch'" class="ml-1 text-white/60">{{ stats.bossDefeated + 1 }}/{{ stats.bossTotal }}</span>
       </div>
       <div class="h-5 overflow-hidden rounded-full bg-black/50 ring-1 ring-rose-400/40 backdrop-blur-md">
         <div

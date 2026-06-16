@@ -1,13 +1,14 @@
 <template>
   <landing-screen
     v-if="screen === 'landing'"
-    @start="screen = 'difficulty'"
+    @start="screen = 'mode'"
     @leaderboard="screen = 'leaderboard'"
     @bestiary="screen = 'bestiary'"
     @messages="screen = 'messages'"
     @online-history="screen = 'onlineHistory'"
   />
-  <difficulty-screen v-else-if="screen === 'difficulty'" @select="onSelectDifficulty" @back="screen = 'landing'" />
+  <mode-screen v-else-if="screen === 'mode'" @select="onSelectMode" @back="screen = 'landing'" />
+  <difficulty-screen v-else-if="screen === 'difficulty'" @select="onSelectDifficulty" @back="screen = 'mode'" />
   <leaderboard-screen v-else-if="screen === 'leaderboard'" @back="screen = 'landing'" />
   <bestiary-screen v-else-if="screen === 'bestiary'" @back="screen = 'landing'" />
   <message-board-screen v-else-if="screen === 'messages'" @back="screen = 'landing'" />
@@ -28,6 +29,7 @@
     :start-run-state="startRun"
     :gold-multiplier="goldMul"
     :difficulty="difficulty"
+    :mode="gameMode"
     @gameover="onGameOver"
     @menu="screen = 'landing'"
   />
@@ -43,18 +45,25 @@ import BestiaryScreen from './components/bestiary-screen.vue';
 import DifficultyScreen from './components/difficulty-screen.vue';
 import MessageBoardScreen from './components/message-board-screen.vue';
 import OnlineHistoryScreen from './components/online-history-screen.vue';
+import ModeScreen from './components/mode-screen.vue';
 import { loadMeta, saveMeta, computeStartRunState, goldMultiplier, PERMA, permaCost } from './game/meta';
 import { getCharacter } from './game/characters';
 import { addRecord, recordStats, getPlayerName } from './game/leaderboard';
 import { getDifficulty, type Difficulty } from './game/difficulty';
 import { submitRun } from './game/api';
 import type { RunState } from './game/upgrades';
-import type { RunResult } from './game/game';
+import type { RunResult, GameMode } from './game/game';
 
 const meta = reactive(loadMeta());
 const screen = ref<
-  'landing' | 'difficulty' | 'menu' | 'game' | 'leaderboard' | 'bestiary' | 'messages' | 'onlineHistory'
+  'landing' | 'mode' | 'difficulty' | 'menu' | 'game' | 'leaderboard' | 'bestiary' | 'messages' | 'onlineHistory'
 >('landing');
+
+const gameMode = ref<GameMode>('story');
+function onSelectMode(m: GameMode) {
+  gameMode.value = m;
+  screen.value = 'difficulty';
+}
 
 const startRun = shallowRef<RunState>();
 const characterColor = ref<[number, number, number]>([1, 1, 1]);
@@ -98,6 +107,9 @@ function onGameOver(result: RunResult) {
       gold: result.gold,
       won: result.won,
       difficulty: diffId,
+      mode: result.mode,
+      wave: result.wave,
+      score: result.score,
       at: Date.now(),
     });
   }
@@ -112,6 +124,9 @@ function onGameOver(result: RunResult) {
     won: result.won,
     difficulty: diffId,
     cheated: result.cheated,
+    mode: result.mode,
+    wave: result.wave,
+    score: result.score,
   });
 }
 

@@ -10,6 +10,12 @@ export interface RunRecord {
   won: boolean;
   /** 難度 id（easy/normal/hard/nightmare/hell） */
   difficulty: string;
+  /** 遊戲模式 story/deathmatch */
+  mode: string;
+  /** 死鬥波數 */
+  wave: number;
+  /** 死鬥分數 */
+  score: number;
   /** 紀錄時間（毫秒），由呼叫端帶入 */
   at: number;
 }
@@ -83,9 +89,12 @@ export function recordStats(time: number, kills: number): GlobalStats {
 export function addRecord(record: RunRecord): RunRecord[] {
   const list = loadRecords();
   list.push(record);
-  const cleared = list.filter((r) => r.won).sort((a, b) => a.time - b.time).slice(0, MAX); // 最快破關
-  const survival = list.filter((r) => !r.won).sort((a, b) => b.time - a.time).slice(0, MAX); // 最久存活
-  const merged = [...cleared, ...survival];
+  const dm = list.filter((r) => r.mode === 'deathmatch'); // 死鬥（依分數）
+  const story = list.filter((r) => r.mode !== 'deathmatch');
+  const cleared = story.filter((r) => r.won).sort((a, b) => a.time - b.time).slice(0, MAX); // 最快破關
+  const survival = story.filter((r) => !r.won).sort((a, b) => b.time - a.time).slice(0, MAX); // 最久存活
+  const death = dm.sort((a, b) => b.score - a.score).slice(0, MAX); // 死鬥高分
+  const merged = [...cleared, ...survival, ...death];
   try {
     localStorage.setItem(KEY, JSON.stringify(merged));
   } catch {

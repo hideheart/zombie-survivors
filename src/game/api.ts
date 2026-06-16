@@ -24,6 +24,12 @@ export interface RunSubmit {
   difficulty: string;
   /** 本局是否動過 debug（後端據此標記、排除於排行榜） */
   cheated: boolean;
+  /** 遊戲模式 story/deathmatch */
+  mode: string;
+  /** 死鬥波數 */
+  wave: number;
+  /** 死鬥分數 */
+  score: number;
 }
 
 /** 送出一場結算（fire-and-forget，離線/失敗則忽略） */
@@ -39,15 +45,21 @@ export async function submitRun(run: RunSubmit): Promise<void> {
   }
 }
 
-/** 取全球排行榜；mode=cleared 破關榜（最快）/survival 生存榜（最久）；可選難度過濾；失敗回傳 null */
+/**
+ * 取全球排行榜。
+ * - gameMode='story'：board=cleared 破關榜（最快）/survival 生存榜（最久）
+ * - gameMode='deathmatch'：死鬥榜（依分數高到低，board 參數忽略）
+ * 可選難度過濾；失敗回傳 null
+ */
 export async function fetchLeaderboard(
   limit = 10,
   difficulty?: string,
-  mode: 'cleared' | 'survival' = 'survival',
+  board: 'cleared' | 'survival' = 'survival',
+  gameMode: 'story' | 'deathmatch' = 'story',
 ): Promise<RunRecord[] | null> {
   try {
     const q = difficulty ? `&difficulty=${encodeURIComponent(difficulty)}` : '';
-    const res = await fetch(`${BASE}/leaderboard?limit=${limit}&mode=${mode}${q}`);
+    const res = await fetch(`${BASE}/leaderboard?limit=${limit}&mode=${board}&gmode=${gameMode}${q}`);
     if (!res.ok) return null;
     return (await res.json()) as RunRecord[];
   } catch {

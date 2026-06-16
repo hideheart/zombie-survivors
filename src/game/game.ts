@@ -18,6 +18,9 @@ import type { AnimationGroup } from '@babylonjs/core';
 import { createTerrain } from './terrain';
 import { DIFFICULTIES, type Difficulty } from './difficulty';
 import { getQuality, type QualityId } from './quality';
+import { DEATHMATCH, deathmatchScore, dmHpMul, dmSpeedMul, dmContactMul } from './deathmatch';
+
+export type GameMode = 'story' | 'deathmatch';
 import { scatterGroundDecals, buildRoads } from './ground-decals';
 import { CONFIG } from './config';
 import { Input } from './input';
@@ -67,6 +70,14 @@ export interface GameStats {
   goldEarned: number;
   /** 目前背景音樂索引（隨進度自動切換，供下拉同步顯示） */
   musicTrack: number;
+  /** 遊戲模式 */
+  mode: GameMode;
+  /** 死鬥波數 */
+  wave: number;
+  /** 連殺數（死鬥；受擊歸零） */
+  combo: number;
+  /** 波數字卡文字（非空時 HUD 大字顯示） */
+  waveCard: string;
 }
 
 export interface RunResult {
@@ -78,6 +89,12 @@ export interface RunResult {
   won: boolean;
   /** 本局是否動過 debug（true 則不列入排行榜） */
   cheated: boolean;
+  /** 遊戲模式 */
+  mode: GameMode;
+  /** 死鬥到達波數（劇情模式為 0） */
+  wave: number;
+  /** 死鬥分數（劇情模式為 0） */
+  score: number;
 }
 
 export interface GameOptions {
@@ -95,6 +112,8 @@ export interface GameOptions {
   difficulty?: Difficulty;
   /** 畫質（預設高；只影響渲染成本，不影響玩法） */
   quality?: QualityId;
+  /** 遊戲模式：story（劇情/破關）或 deathmatch（無盡死鬥） */
+  mode?: GameMode;
 }
 
 export interface GameHandle {
@@ -220,6 +239,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
 
   const goldMul = options.goldMultiplier ?? 1;
   const diff = options.difficulty ?? DIFFICULTIES[0];
+  const mode: GameMode = options.mode ?? 'story';
+  const isDM = mode === 'deathmatch';
   const runTemplate: RunState = options.startRunState ?? createRunState();
 
   const input = new Input();
@@ -295,6 +316,13 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
   let kills = 0;
   let time = 0;
   let goldEarned = 0;
+  /** 死鬥狀態：波數、連殺、Boss Rush 計數、波數字卡 */
+  let wave = 0;
+  let lastWave = 0;
+  let combo = 0;
+  let bossRush = 0;
+  let waveCardText = '';
+  let waveCardUntil = 0;
   let hurtTimer = 0;
   /** 受傷飄字用：兩次回饋之間累計的扣血量 */
   let dmgAccum = 0;
@@ -452,6 +480,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     bossTotal: BOSS_COUNT,
     goldEarned: 0,
     musicTrack: 0,
+    mode,
+    wave: 0,
+    combo: 0,
+    waveCard: '',
   };
 
   function pushStats() {
@@ -474,6 +506,9 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     stats.bossDefeated = bossDefeated;
     stats.goldEarned = goldEarned;
     stats.musicTrack = musicTrackIdx;
+    stats.wave = wave;
+    stats.combo = combo;
+    stats.waveCard = time < waveCardUntil ? waveCardText : '';
     options.onStats?.(stats);
   }
 
@@ -487,7 +522,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
   }
 
   function enterLevelUp() {
-    const rolled = rollChoices(levels);
+    const rolled = rollChoices(levels, 3, isDM); // 死鬥不設滿級上限
     if (rolled.length === 0) return; // 全滿級，略過暫停
     choices = rolled;
     state = 'levelup';
@@ -562,15 +597,38 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     player.position.y = groundY + jumpY;
     camera.target.set(px, groundY + 1.2, pz);
 
-    /** 生成導演：隨時間升壓 */
-    enemies.hpMul = (1 + time * CONFIG.director.hpGrowthPerSec * diff.growth) * diff.enemyHp;
+    /** 死鬥：波數推進（每 waveSec 秒一波），進新波時跳字卡 + Boss Rush */
+    if (isDM) {
+      wave = Math.floor(time / DEATHMATCH.waveSec) + 1;
+      if (wave !== lastWave) {
+        lastWave = wave;
+        const milestone = wave % 10 === 0;
+        waveCardText = milestone ? `第 ${wave} 波！！` : `第 ${wave} 波`;
+        waveCardUntil = time + (milestone ? 2.6 : 1.6);
+        if (milestone) sound.levelUp();
+        else sound.buff();
+        /** 每 bossEveryWaves 波插入一隻王（循環，血量隨波數加成） */
+        if (wave % DEATHMATCH.bossEveryWaves === 0 && !boss.active) {
+          boss.setHpScale(diff.bossHp * (1 + wave * 0.12));
+          boss.spawn(bossRush % BOSS_COUNT, px, pz);
+          bossRush += 1;
+          sound.bossSpawn();
+        }
+      }
+    }
+
+    /** 生成導演：隨時間升壓（死鬥再疊波數倍率） */
+    enemies.hpMul = (1 + time * CONFIG.director.hpGrowthPerSec * diff.growth) * diff.enemyHp * (isDM ? dmHpMul(wave) : 1);
     /** 怪速含「時緩」倍率與難度 */
-    enemies.speedMul = (1 + time * CONFIG.director.speedGrowthPerSec * diff.growth) * eff.enemySpeedMul * diff.enemySpeed;
+    enemies.speedMul =
+      (1 + time * CONFIG.director.speedGrowthPerSec * diff.growth) * eff.enemySpeedMul * diff.enemySpeed * (isDM ? dmSpeedMul(wave) : 1);
     enemies.tier = Math.min(1, time / 120);
-    const target = Math.min(
-      CONFIG.director.maxCount,
-      CONFIG.director.baseCount + Math.floor(time / CONFIG.director.stepIntervalSec) * CONFIG.director.addPerStep,
-    );
+    const target = isDM
+      ? Math.min(CONFIG.director.maxCount, CONFIG.director.baseCount + wave * DEATHMATCH.countPerWave)
+      : Math.min(
+          CONFIG.director.maxCount,
+          CONFIG.director.baseCount + Math.floor(time / CONFIG.director.stepIntervalSec) * CONFIG.director.addPerStep,
+        );
     enemies.setCount(target, px, pz);
 
     grid.clear();
@@ -585,13 +643,15 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       slowField.setEnabled(false);
     }
 
-    /** 王：依序登場（共 BOSS_COUNT 隻） */
-    bossTimer += dt;
-    if (!boss.active && bossCount < BOSS_COUNT && bossTimer >= CONFIG.boss.intervalSec) {
-      bossTimer = 0;
-      boss.spawn(bossCount, px, pz);
-      sound.bossSpawn();
-      bossCount += 1;
+    /** 劇情模式：王依序登場（共 BOSS_COUNT 隻）。死鬥模式改由波數觸發 Boss Rush */
+    if (!isDM) {
+      bossTimer += dt;
+      if (!boss.active && bossCount < BOSS_COUNT && bossTimer >= CONFIG.boss.intervalSec) {
+        bossTimer = 0;
+        boss.spawn(bossCount, px, pz);
+        sound.bossSpawn();
+        bossCount += 1;
+      }
     }
 
     /** 本幀累積的吸血量，於下方依「每秒上限」結算（避免高擊殺率無限回血） */
@@ -603,6 +663,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       bloodDecals.spawn(x, z, y + 0.03);
       /** 吸血：先累積，稍後封頂結算 */
       if (eff.lifestealOnKill > 0) lifestealAccrued += eff.lifestealOnKill;
+      combo += 1; // 連殺（受擊歸零）
       sound.hit();
     };
     kills += weapon.update(dt, px, pz, enemies, boss, grid, eff, onKill, groundY);
@@ -631,14 +692,15 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
         const d = Math.random() * 3;
         gems.spawn(boss.x + Math.cos(a) * d, boss.z + Math.sin(a) * d);
       }
-      /** 擊敗最終王 → 破關 */
-      if (bossDefeated >= BOSS_COUNT) {
+      combo += 1; // 擊敗王也算連殺
+      /** 擊敗最終王 → 破關（僅劇情模式；死鬥無破關，繼續無盡） */
+      if (!isDM && bossDefeated >= BOSS_COUNT) {
         goldEarned = Math.floor((kills * 0.6 + time) * goldMul) + 500;
         state = 'won';
         sound.levelUp();
         hazards.reset();
         pushStats();
-        options.onGameOver?.({ gold: goldEarned, kills, time, level, won: true, cheated });
+        options.onGameOver?.({ gold: goldEarned, kills, time, level, won: true, cheated, mode, wave, score: 0 });
         return;
       }
     }
@@ -649,7 +711,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
 
     /** 道具：每 15 秒生成寶箱與回血，並更新拾取 */
     chestTimer += dt;
-    if (chestTimer >= CONFIG.items.chestInterval / 1000) {
+    /** 死鬥寶箱頻率加倍 */
+    if (chestTimer >= (CONFIG.items.chestInterval / 1000) * (isDM ? 0.5 : 1)) {
       chestTimer = 0;
       spawnItem('chest');
     }
@@ -662,8 +725,9 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
 
     const collected = gems.update(dt, px, pz, eff.pickupRadius);
     if (collected > 0) {
-      /** 每顆寶石基礎經驗（預設 4） */
-      xp += collected * 4 * eff.xpMultiplier * (xpDebug ? 10 : 1);
+      /** 每顆寶石基礎經驗（預設 4）；死鬥連殺給經驗加成（最多 +50%） */
+      const comboXp = isDM ? 1 + Math.min(combo, 50) * 0.01 : 1;
+      xp += collected * 4 * eff.xpMultiplier * (xpDebug ? 10 : 1) * comboXp;
       if (xp >= xpToNext) {
         xp -= xpToNext;
         level += 1;
@@ -680,7 +744,11 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       const dz = enemies.getZ(j) - pz;
       if (dx * dx + dz * dz <= contactRange2) touching = true;
     });
-    const contactDps = CONFIG.player.contactDps * (1 + time * CONFIG.director.contactGrowthPerSec * diff.growth) * diff.enemyContact;
+    const contactDps =
+      CONFIG.player.contactDps *
+      (1 + time * CONFIG.director.contactGrowthPerSec * diff.growth) *
+      diff.enemyContact *
+      (isDM ? dmContactMul(wave) : 1);
     const bossTouch = boss.contactsPlayer(px, pz, CONFIG.player.radius);
 
     /** 護盾：定期生成，可擋下一次傷害 */
@@ -713,6 +781,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     if (incoming > 0) {
       hp -= incoming;
       dmgAccum += incoming;
+      combo = 0; // 受擊歸零連殺
     }
 
     /** 護盾視覺 */
@@ -742,7 +811,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       state = 'dead';
       sound.playerDeath();
       pushStats();
-      options.onGameOver?.({ gold: goldEarned, kills, time, level, won: false, cheated });
+      const score = isDM ? deathmatchScore(wave, kills, time) : 0;
+      options.onGameOver?.({ gold: goldEarned, kills, time, level, won: false, cheated, mode, wave, score });
     }
 
     time += dt;

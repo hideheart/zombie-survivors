@@ -3,6 +3,12 @@
     <div class="w-[min(90vw,26rem)] rounded-3xl bg-[#1a2236] p-8 text-center text-white shadow-2xl ring-1 ring-white/10">
       <div class="text-4xl font-black text-rose-400">你被殭屍吞噬了！</div>
 
+      <!-- 死鬥：波數 + 分數 -->
+      <div v-if="stats.mode === 'deathmatch'" class="my-4 rounded-2xl bg-rose-500/15 py-3">
+        <div class="text-sm text-white/60">撐到 第 {{ stats.wave }} 波</div>
+        <div class="text-3xl font-black text-amber-300">{{ deathScore }} 分</div>
+      </div>
+
       <div class="my-5 grid grid-cols-3 gap-3">
         <div class="rounded-2xl bg-white/5 p-3">
           <div class="text-xs text-white/60">存活</div>
@@ -53,4 +59,6 @@ const timeText = computed(() => {
   const s = total % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
 });
+/** 死鬥分數：波數×1000 + 擊殺 + 秒數（與後端 deathmatchScore 一致） */
+const deathScore = computed(() => props.stats.wave * 1000 + props.stats.kills + Math.floor(props.stats.time));
 </script>

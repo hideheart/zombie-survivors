@@ -265,9 +265,9 @@ export const UPGRADES: Upgrade[] = [
   },
 ];
 
-/** 從尚未滿級的升級中隨機抽 n 個 */
-export function rollChoices(levels: Record<string, number>, n = 3): Upgrade[] {
-  const pool = UPGRADES.filter((u) => (levels[u.id] ?? 0) < u.maxLevel);
+/** 從尚未滿級的升級中隨機抽 n 個；uncapped=true 時忽略滿級上限（死鬥無盡強化） */
+export function rollChoices(levels: Record<string, number>, n = 3, uncapped = false): Upgrade[] {
+  const pool = UPGRADES.filter((u) => uncapped || (levels[u.id] ?? 0) < u.maxLevel);
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];

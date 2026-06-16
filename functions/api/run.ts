@@ -22,6 +22,9 @@ export const onRequestPost = async ({ request, env }: FnContext): Promise<Respon
   const name = sanitizeText(body.name, 16) || '倖存者';
   const character = sanitizeText(body.character, 16) || '?';
   const difficulty = sanitizeText(body.difficulty, 16) || 'easy';
+  const mode = sanitizeText(body.mode, 16) === 'deathmatch' ? 'deathmatch' : 'story';
+  const score = clampInt(body.score, 0, 100_000_000);
+  const wave = clampInt(body.wave, 0, 100_000);
   const deviceId = sanitizeText(body.deviceId, 64);
   const now = Date.now();
 
@@ -29,9 +32,9 @@ export const onRequestPost = async ({ request, env }: FnContext): Promise<Respon
     const stmts = [
       env.DB
         .prepare(
-          'INSERT INTO runs (device_id,name,character,time,kills,level,gold,won,difficulty,cheated,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+          'INSERT INTO runs (device_id,name,character,time,kills,level,gold,won,difficulty,cheated,mode,score,wave,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
         )
-        .bind(deviceId, name, character, time, kills, level, gold, won, difficulty, cheated, now),
+        .bind(deviceId, name, character, time, kills, level, gold, won, difficulty, cheated, mode, score, wave, now),
     ];
     /** 作弊局不累加全球統計（避免 EXP×10／無敵 farm 灌水） */
     if (!cheated) {
