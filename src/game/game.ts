@@ -681,6 +681,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     let eliteChance = isDM ? Math.min(0.25, wave * 0.015) : 0;
     explodeActive = false;
     enemies.respawnAtDeath = false;
+    enemies.forceCrawl = false;
     if (isDM && curMutator) {
       switch (curMutator.id) {
         case 'rage': dmSpeedExtra = 1.45; break;
@@ -689,6 +690,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
         case 'explode': explodeActive = true; break;
         case 'split': enemies.respawnAtDeath = true; densityBoost += 8; break;
         case 'elite': eliteChance = Math.max(eliteChance, 0.5); break;
+        case 'crawl': enemies.forceCrawl = true; dmSpeedExtra = 0.8; break;
       }
     }
     const inTide = isDM && time < bloodTideUntil;

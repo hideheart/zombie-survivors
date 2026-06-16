@@ -13,6 +13,8 @@ interface ZombieType {
   scale: number;
   /** 遠程射手：保持距離並朝玩家發射彈丸 */
   ranged?: boolean;
+  /** 在地上爬行（播 Crawl 動畫） */
+  crawl?: boolean;
 }
 
 /** 遠程怪：發射間隔、開火距離、保持距離、彈丸傷害 */
@@ -27,6 +29,7 @@ const ZOMBIE_TYPES: ZombieType[] = [
   { path: '/models/zombie/zombie_arm.glb', hp: 4, speed: 5, scale: 1 },
   { path: '/models/zombie/zombie_skeleton.glb', hp: 4, speed: 6, scale: 1 }, // 不死骷髏
   { path: '/models/zombie/zombie_skeleton_headless.glb', hp: 6, speed: 5, scale: 1, ranged: true }, // 無頭骷髏（遠程）
+  { path: '/models/zombie/zombie_basic.glb', hp: 5, speed: 4, scale: 1, crawl: true }, // 爬行殭屍（趴地爬行）
 ];
 
 /** 怪物圖鑑資訊（供選單顯示） */
@@ -37,10 +40,11 @@ export const ZOMBIE_INFO = [
   { name: '斷臂殭屍', role: '一般', desc: '中規中矩的近戰殭屍，速度與血量都中等。', model: '/models/zombie/zombie_arm.glb' },
   { name: '骷髏兵', role: '不死', desc: '海盜骷髏，移動偏快、血量普通，成群出現。', model: '/models/zombie/zombie_skeleton.glb' },
   { name: '無頭骷髏', role: '遠程', desc: '保持距離朝你發射彈丸的不死射手，會被逼近時後退。', model: '/models/zombie/zombie_skeleton_headless.glb' },
+  { name: '爬行殭屍', role: '爬行', desc: '趴在地上爬行逼近，速度偏慢但姿態低、混在屍群中不易察覺。', model: '/models/zombie/zombie_basic.glb' },
 ];
 
 const BASE_HEIGHT = 2.4;
-/** 每種類型預先 instantiate 的數量（總和為怪海上限；6 類型 × 9 = 54 ≥ director.maxCount） */
+/** 每種類型預先 instantiate 的數量（總和為怪海上限；7 類型 × 9 = 63 ≥ director.maxCount） */
 const PER_TYPE = 9;
 /** 怪物血量全域倍率 */
 const HP_SCALE = 0.75;
@@ -50,8 +54,15 @@ const WHITE = new Color3(1, 1, 1);
 
 interface Entry {
   root: TransformNode;
-  anim?: AnimationGroup;
+  /** 站立移動動畫（walk/run） */
+  walkAnim?: AnimationGroup;
+  /** 爬行動畫（Crawl），無則為 undefined */
+  crawlAnim?: AnimationGroup;
   baseSpeed: number;
+  /** 此類型是否本來就爬行 */
+  isCrawl: boolean;
+  /** 目前是否播放爬行 */
+  crawling: boolean;
   /** 實際渲染的網格，用於受擊白光 overlay */
   meshes: AbstractMesh[];
 }
@@ -69,6 +80,8 @@ export class ZombieHorde {
   eliteChance = 0;
   /** 分裂潮：擊殺後在原地附近復活（而非外圈），形成在地纏鬥 */
   respawnAtDeath = false;
+  /** 爬行潮突變：強制全部殭屍改爬行 */
+  forceCrawl = false;
   /** 最近一次擊殺是否為菁英（供呼叫端在 onKill 給額外獎勵；於 damage() 內、respawn 前設定） */
   lastKillWasElite = false;
 
@@ -128,10 +141,13 @@ export class ZombieHorde {
         holder.setEnabled(false);
 
         inst.animationGroups.forEach((a) => a.stop());
-        const anim =
-          inst.animationGroups.find((a) => /walk|run|move/i.test(a.name)) ??
+        /** 移動動作多樣化：同類型的 9 隻輪流分配 Run / Run_Arms / Run_Attack / Walk，怪群不再整齊劃一 */
+        const moveClips = inst.animationGroups.filter((a) => /walk|run/i.test(a.name));
+        const walkAnim =
+          (moveClips.length ? moveClips[k % moveClips.length] : undefined) ??
           inst.animationGroups.find((a) => /idle/i.test(a.name)) ??
           inst.animationGroups[0];
+        const crawlAnim = inst.animationGroups.find((a) => /crawl/i.test(a.name));
 
         /** 取出實際網格，預設關閉白光 overlay */
         const meshes = modelRoot.getChildMeshes(false);
@@ -141,7 +157,7 @@ export class ZombieHorde {
           m.renderOverlay = false;
         }
 
-        this.pool.push({ root: holder, anim, baseSpeed: t.speed, meshes });
+        this.pool.push({ root: holder, walkAnim, crawlAnim, baseSpeed: t.speed, isCrawl: !!t.crawl, crawling: false, meshes });
       }
     }
 
@@ -195,7 +211,12 @@ export class ZombieHorde {
     entry.root.position.z = this.posZ[i];
     entry.root.position.y = this.heightAt(this.posX[i], this.posZ[i]);
     entry.root.setEnabled(true);
-    entry.anim?.start(true, 0.8 + Math.random() * 0.4);
+    /** 依「本來就爬行」或「爬行潮」決定播 Crawl 或 Walk */
+    const wantCrawl = (entry.isCrawl || this.forceCrawl) && !!entry.crawlAnim;
+    entry.crawling = wantCrawl;
+    entry.walkAnim?.stop();
+    entry.crawlAnim?.stop();
+    (wantCrawl ? entry.crawlAnim : entry.walkAnim)?.start(true, 0.8 + Math.random() * 0.4);
   }
 
   /** 是否為菁英 */
@@ -209,7 +230,8 @@ export class ZombieHorde {
     for (let i = this.count; i < clamped; i++) this.spawn(i, playerX, playerZ);
     for (let i = clamped; i < this.count; i++) {
       this.pool[i].root.setEnabled(false);
-      this.pool[i].anim?.stop();
+      this.pool[i].walkAnim?.stop();
+      this.pool[i].crawlAnim?.stop();
     }
     this.count = clamped;
   }
@@ -220,6 +242,7 @@ export class ZombieHorde {
     this.tier = 0;
     this.eliteChance = 0;
     this.respawnAtDeath = false;
+    this.forceCrawl = false;
     this.lastKillWasElite = false;
     if (!this.ready) {
       this.count = 0;
@@ -227,7 +250,8 @@ export class ZombieHorde {
     }
     for (let i = 0; i < this.pool.length; i++) {
       this.pool[i].root.setEnabled(false);
-      this.pool[i].anim?.stop();
+      this.pool[i].walkAnim?.stop();
+      this.pool[i].crawlAnim?.stop();
     }
     this.count = 0;
   }
@@ -350,12 +374,22 @@ export class ZombieHorde {
       this.posX[i] = nx;
       this.posZ[i] = nz;
 
-      const root = this.pool[i].root;
+      const entry = this.pool[i];
+      const root = entry.root;
       root.position.x = nx;
       root.position.z = nz;
       root.position.y = this.heightAt(nx, nz);
       /** 面向玩家（模型前方 +Z） */
       root.rotation.y = Math.atan2(dirX, dirZ);
+
+      /** 爬行潮：依 forceCrawl 即時切換 Crawl / Walk（僅狀態改變時切） */
+      const wantCrawl = (entry.isCrawl || this.forceCrawl) && !!entry.crawlAnim;
+      if (wantCrawl !== entry.crawling) {
+        entry.crawling = wantCrawl;
+        entry.walkAnim?.stop();
+        entry.crawlAnim?.stop();
+        (wantCrawl ? entry.crawlAnim : entry.walkAnim)?.start(true, 0.8 + Math.random() * 0.4);
+      }
 
       /** 受擊白光回饋：整隻殭屍閃白（per-mesh overlay，不影響其他殭屍） */
       const meshes = this.pool[i].meshes;

@@ -23,7 +23,7 @@ export const DEATHMATCH = {
 
 /** 每波突變子（隨機掛一個全場效果，效果於 game.ts 套用） */
 export interface Mutator {
-  id: 'rage' | 'frail' | 'giant' | 'explode' | 'split' | 'elite';
+  id: 'rage' | 'frail' | 'giant' | 'explode' | 'split' | 'elite' | 'crawl';
   name: string;
   emoji: string;
   desc: string;
@@ -35,6 +35,7 @@ export const MUTATORS: Mutator[] = [
   { id: 'explode', name: '爆裂', emoji: '🔥', desc: '怪物死亡會在原地小爆炸' },
   { id: 'split', name: '分裂潮', emoji: '🧫', desc: '怪物變多，死掉在原地補上' },
   { id: 'elite', name: '菁英潮', emoji: '💀', desc: '大量菁英怪出沒' },
+  { id: 'crawl', name: '爬行潮', emoji: '🧟', desc: '全部殭屍趴地爬行（慢但難察覺）' },
 ];
 
 /** 死鬥分數：波數主導，擊殺與存活當細分 */
