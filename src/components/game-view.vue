@@ -234,6 +234,7 @@ const stats = reactive<GameStats>({
   wave: 0,
   combo: 0,
   waveCard: '',
+  mutator: '',
 });
 
 let game: GameHandle | undefined;

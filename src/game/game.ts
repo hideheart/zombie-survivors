@@ -18,9 +18,19 @@ import type { AnimationGroup } from '@babylonjs/core';
 import { createTerrain } from './terrain';
 import { DIFFICULTIES, type Difficulty } from './difficulty';
 import { getQuality, type QualityId } from './quality';
-import { DEATHMATCH, deathmatchScore, dmHpMul, dmSpeedMul, dmContactMul } from './deathmatch';
+import { DEATHMATCH, deathmatchScore, dmHpMul, dmSpeedMul, dmContactMul, MUTATORS, type Mutator } from './deathmatch';
 
 export type GameMode = 'story' | 'deathmatch';
+
+/** 死鬥「祝福／詛咒」二選一（高風險高報酬，套用至 RunState） */
+const BLESSINGS: Upgrade[] = [
+  { id: 'bc_berserk', name: '嗜血狂戰', emoji: '⚔️', desc: '傷害 +45%，但最大生命 -30', maxLevel: 99, apply: (s) => { s.damage = Math.ceil(s.damage * 1.45); s.maxHp = Math.max(20, s.maxHp - 30); } },
+  { id: 'bc_tank', name: '鋼鐵之軀', emoji: '🛡️', desc: '減傷 +20%，但移速 -15%', maxLevel: 99, apply: (s) => { s.damageReduction = Math.min(0.7, s.damageReduction + 0.2); s.moveSpeed *= 0.85; } },
+  { id: 'bc_swift', name: '疾風之刃', emoji: '🌪️', desc: '攻速 +30%，但傷害 -15%', maxLevel: 99, apply: (s) => { s.fireInterval *= 0.7; s.damage = Math.max(1, Math.round(s.damage * 0.85)); } },
+  { id: 'bc_crit', name: '賭命一擊', emoji: '🎯', desc: '暴擊 +30%，但攻速 -10%', maxLevel: 99, apply: (s) => { s.critChance = Math.min(0.85, s.critChance + 0.3); s.fireInterval *= 1.1; } },
+  { id: 'bc_greed', name: '貪婪', emoji: '🧲', desc: '經驗 +60%、拾取 +60%，但最大生命 -20', maxLevel: 99, apply: (s) => { s.xpMultiplier *= 1.6; s.pickupRadius *= 1.6; s.maxHp = Math.max(20, s.maxHp - 20); } },
+  { id: 'bc_rage', name: '狂暴化', emoji: '💉', desc: '傷害 +70%，但減傷 -25%', maxLevel: 99, apply: (s) => { s.damage = Math.ceil(s.damage * 1.7); s.damageReduction = Math.max(0, s.damageReduction - 0.25); } },
+];
 import { scatterGroundDecals, buildRoads } from './ground-decals';
 import { CONFIG } from './config';
 import { Input } from './input';
@@ -78,6 +88,8 @@ export interface GameStats {
   combo: number;
   /** 波數字卡文字（非空時 HUD 大字顯示） */
   waveCard: string;
+  /** 目前突變子／血潮標籤（死鬥 HUD 顯示，空字串為無） */
+  mutator: string;
 }
 
 export interface RunResult {
@@ -168,6 +180,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
 
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.05, 0.07, 0.13, 1);
+  const baseClear = scene.clearColor.clone();
+  const tideClear = new Color4(0.2, 0.04, 0.05, 1); // 血潮：畫面轉紅
   /** 輝光層：讓發光材質（子彈、衛星、閃電、火花等）泛光更顯眼 */
   const glow = new GlowLayer('glow', scene);
   glow.intensity = quality.glow;
@@ -323,6 +337,9 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
   let bossRush = 0;
   let waveCardText = '';
   let waveCardUntil = 0;
+  let curMutator: Mutator | null = null;
+  let bloodTideUntil = 0;
+  let bloodTideActive = false;
   let hurtTimer = 0;
   /** 受傷飄字用：兩次回饋之間累計的扣血量 */
   let dmgAccum = 0;
@@ -484,6 +501,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     wave: 0,
     combo: 0,
     waveCard: '',
+    mutator: '',
   };
 
   function pushStats() {
@@ -509,6 +527,13 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     stats.wave = wave;
     stats.combo = combo;
     stats.waveCard = time < waveCardUntil ? waveCardText : '';
+    stats.mutator = isDM
+      ? time < bloodTideUntil
+        ? '🩸 血潮來襲'
+        : curMutator
+          ? `${curMutator.emoji} ${curMutator.name}`
+          : ''
+      : '';
     options.onStats?.(stats);
   }
 
@@ -528,6 +553,19 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     state = 'levelup';
     levelUpBurst(scene, new Vector3(player.position.x, player.position.y + 1, player.position.z));
     sound.levelUp();
+    pushStats();
+  }
+
+  /** 死鬥祝福／詛咒：隨機抽 2 個高風險高報酬選項，沿用升級彈窗 */
+  function enterChoice() {
+    const pool = [...BLESSINGS];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    choices = pool.slice(0, 2);
+    state = 'levelup';
+    sound.buff();
     pushStats();
   }
 
@@ -597,34 +635,92 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     player.position.y = groundY + jumpY;
     camera.target.set(px, groundY + 1.2, pz);
 
-    /** 死鬥：波數推進（每 waveSec 秒一波），進新波時跳字卡 + Boss Rush */
+    /** 死鬥本幀效果旗標：爆裂突變是否啟用、本幀玩家受到的爆裂傷害 */
+    let explodeActive = false;
+    let explodeAccrued = 0;
+
+    /** 死鬥：波數推進（每 waveSec 秒一波），進新波時排程 Boss Rush／突變／血潮／祝福 */
     if (isDM) {
       wave = Math.floor(time / DEATHMATCH.waveSec) + 1;
       if (wave !== lastWave) {
         lastWave = wave;
+        /** 突變子：每 3 波換一個，其餘波清除 */
+        curMutator = wave >= 3 && wave % 3 === 0 ? MUTATORS[Math.floor(Math.random() * MUTATORS.length)] : null;
         const milestone = wave % 10 === 0;
-        waveCardText = milestone ? `第 ${wave} 波！！` : `第 ${wave} 波`;
-        waveCardUntil = time + (milestone ? 2.6 : 1.6);
-        if (milestone) sound.levelUp();
-        else sound.buff();
-        /** 每 bossEveryWaves 波插入一隻王（循環，血量隨波數加成） */
-        if (wave % DEATHMATCH.bossEveryWaves === 0 && !boss.active) {
+        const isBossWave = wave % DEATHMATCH.bossEveryWaves === 0;
+        const isTideWave = wave >= 4 && wave % 5 === 4;
+        waveCardText = isBossWave
+          ? `第 ${wave} 波・王來了！`
+          : isTideWave
+            ? '🩸 血潮來襲！'
+            : curMutator
+              ? `突變：${curMutator.emoji}${curMutator.name}`
+              : milestone
+                ? `第 ${wave} 波！！`
+                : `第 ${wave} 波`;
+        waveCardUntil = time + (milestone || isBossWave || isTideWave ? 2.6 : 1.6);
+        sound.buff();
+        /** Boss Rush：每 bossEveryWaves 波一隻王（循環，血量隨波數加成） */
+        if (isBossWave && !boss.active) {
           boss.setHpScale(diff.bossHp * (1 + wave * 0.12));
           boss.spawn(bossRush % BOSS_COUNT, px, pz);
           bossRush += 1;
           sound.bossSpawn();
         }
+        /** 血潮：20 秒高密度狂暴時段 */
+        if (isTideWave) bloodTideUntil = time + 20;
+        /** 祝福／詛咒：二選一（暫停遊戲彈窗） */
+        if (wave >= 2 && wave % 5 === 2) enterChoice();
       }
     }
 
-    /** 生成導演：隨時間升壓（死鬥再疊波數倍率） */
-    enemies.hpMul = (1 + time * CONFIG.director.hpGrowthPerSec * diff.growth) * diff.enemyHp * (isDM ? dmHpMul(wave) : 1);
+    /** 死鬥效果：突變子 + 血潮，計算對怪物的額外倍率／菁英機率／密度 */
+    let dmHpExtra = 1;
+    let dmSpeedExtra = 1;
+    let densityBoost = 0;
+    let eliteChance = isDM ? Math.min(0.25, wave * 0.015) : 0;
+    explodeActive = false;
+    enemies.respawnAtDeath = false;
+    if (isDM && curMutator) {
+      switch (curMutator.id) {
+        case 'rage': dmSpeedExtra = 1.45; break;
+        case 'frail': dmHpExtra = 0.5; densityBoost += 8; break;
+        case 'giant': eliteChance = 1; dmHpExtra = 1.25; break;
+        case 'explode': explodeActive = true; break;
+        case 'split': enemies.respawnAtDeath = true; densityBoost += 8; break;
+        case 'elite': eliteChance = Math.max(eliteChance, 0.5); break;
+      }
+    }
+    const inTide = isDM && time < bloodTideUntil;
+    if (inTide) densityBoost += 20;
+    /** 血潮進／出場：切畫面色 + 音樂；結束給寶箱獎勵 */
+    if (inTide !== bloodTideActive) {
+      bloodTideActive = inTide;
+      if (inTide) {
+        scene.clearColor = tideClear;
+        musicTrackIdx = 2;
+        sound.setMusicTrack(2);
+      } else {
+        scene.clearColor = baseClear;
+        musicTrackIdx = stageTrack(bossDefeated);
+        sound.setMusicTrack(musicTrackIdx);
+        spawnItem('chest');
+      }
+    }
+    enemies.eliteChance = eliteChance;
+
+    /** 生成導演：隨時間升壓（死鬥再疊波數與突變倍率） */
+    enemies.hpMul = (1 + time * CONFIG.director.hpGrowthPerSec * diff.growth) * diff.enemyHp * (isDM ? dmHpMul(wave) : 1) * dmHpExtra;
     /** 怪速含「時緩」倍率與難度 */
     enemies.speedMul =
-      (1 + time * CONFIG.director.speedGrowthPerSec * diff.growth) * eff.enemySpeedMul * diff.enemySpeed * (isDM ? dmSpeedMul(wave) : 1);
+      (1 + time * CONFIG.director.speedGrowthPerSec * diff.growth) *
+      eff.enemySpeedMul *
+      diff.enemySpeed *
+      (isDM ? dmSpeedMul(wave) : 1) *
+      dmSpeedExtra;
     enemies.tier = Math.min(1, time / 120);
     const target = isDM
-      ? Math.min(CONFIG.director.maxCount, CONFIG.director.baseCount + wave * DEATHMATCH.countPerWave)
+      ? Math.min(CONFIG.director.maxCount, CONFIG.director.baseCount + wave * DEATHMATCH.countPerWave + densityBoost)
       : Math.min(
           CONFIG.director.maxCount,
           CONFIG.director.baseCount + Math.floor(time / CONFIG.director.stepIntervalSec) * CONFIG.director.addPerStep,
@@ -664,6 +760,17 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       /** 吸血：先累積，稍後封頂結算 */
       if (eff.lifestealOnKill > 0) lifestealAccrued += eff.lifestealOnKill;
       combo += 1; // 連殺（受擊歸零）
+      /** 菁英擊殺：額外噴經驗 + 較大爆裂 */
+      if (enemies.lastKillWasElite) {
+        for (let n = 0; n < 3; n++) gems.spawn(x + (Math.random() - 0.5) * 1.6, z + (Math.random() - 0.5) * 1.6);
+        enemyDeathBurst(scene, new Vector3(x, y + CONFIG.enemy.y, z));
+      }
+      /** 爆裂突變：死亡點靠近玩家則造成傷害（稍後併入結算） */
+      if (explodeActive) {
+        const ex = px - x;
+        const ez = pz - z;
+        if (ex * ex + ez * ez < 9) explodeAccrued += 5;
+      }
       sound.hit();
     };
     kills += weapon.update(dt, px, pz, enemies, boss, grid, eff, onKill, groundY);
@@ -771,6 +878,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       if (bossTouch) incoming += boss.contactDps * diff.enemyContact * dt;
     }
     incoming += hazardDmg;
+    incoming += explodeAccrued; // 爆裂突變傷害
     if (invincible) incoming = 0;
     incoming *= 1 - eff.damageReduction;
     if (incoming > 0 && shieldReady) {
@@ -989,6 +1097,17 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       bossTimer = 0;
       bossCount = 0;
       bossDefeated = 0;
+      /** 死鬥狀態重置 */
+      wave = 0;
+      lastWave = 0;
+      combo = 0;
+      bossRush = 0;
+      curMutator = null;
+      waveCardText = '';
+      waveCardUntil = 0;
+      bloodTideUntil = 0;
+      bloodTideActive = false;
+      scene.clearColor = baseClear;
       activeBuffs.length = 0;
       for (const it of itemList) it.node.dispose();
       itemList.length = 0;

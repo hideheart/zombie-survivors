@@ -65,6 +65,12 @@ export class ZombieHorde {
   hpMul = 1;
   speedMul = 1;
   tier = 0;
+  /** 菁英機率（死鬥用）：spawn 時依此機率生成更大、更壯、掉更多經驗的菁英 */
+  eliteChance = 0;
+  /** 分裂潮：擊殺後在原地附近復活（而非外圈），形成在地纏鬥 */
+  respawnAtDeath = false;
+  /** 最近一次擊殺是否為菁英（供呼叫端在 onKill 給額外獎勵；於 damage() 內、respawn 前設定） */
+  lastKillWasElite = false;
 
   private scene: Scene;
   private ready = false;
@@ -74,6 +80,8 @@ export class ZombieHorde {
   private hp: Float32Array;
   /** 受擊回饋計時（>0 時縮放彈跳） */
   private hitFlash: Float32Array;
+  /** 菁英旗標（1=菁英） */
+  private elite: Uint8Array;
   /** 冰凍剩餘時間（>0 時不動） */
   private freezeTimer: Float32Array;
   /** 遠程開火計時 */
@@ -91,6 +99,7 @@ export class ZombieHorde {
     this.posZ = new Float32Array(this.capacity);
     this.hp = new Float32Array(this.capacity);
     this.hitFlash = new Float32Array(this.capacity);
+    this.elite = new Uint8Array(this.capacity);
     this.freezeTimer = new Float32Array(this.capacity);
     this.fireTimer = new Float32Array(this.capacity);
     void this.init();
@@ -158,15 +167,26 @@ export class ZombieHorde {
     root.position.y = -min.y * scale;
   }
 
-  private spawn(i: number, playerX: number, playerZ: number) {
+  private spawn(i: number, playerX: number, playerZ: number, atX?: number, atZ?: number) {
     const entry = this.pool[i];
-    const angle = Math.random() * Math.PI * 2;
-    const dist =
-      CONFIG.enemy.spawnRingMin + Math.random() * (CONFIG.enemy.spawnRingMax - CONFIG.enemy.spawnRingMin);
-    this.posX[i] = playerX + Math.cos(angle) * dist;
-    this.posZ[i] = playerZ + Math.sin(angle) * dist;
-    /** 依 index 對應的類型血量（pool 交錯排列） */
-    this.hp[i] = ZOMBIE_TYPES[i % ZOMBIE_TYPES.length].hp * HP_SCALE * this.hpMul;
+    if (atX !== undefined && atZ !== undefined) {
+      /** 原地附近復活（分裂潮）：圍繞死亡點小範圍散開 */
+      const a = Math.random() * Math.PI * 2;
+      this.posX[i] = atX + Math.cos(a) * 2.5;
+      this.posZ[i] = atZ + Math.sin(a) * 2.5;
+    } else {
+      const angle = Math.random() * Math.PI * 2;
+      const dist =
+        CONFIG.enemy.spawnRingMin + Math.random() * (CONFIG.enemy.spawnRingMax - CONFIG.enemy.spawnRingMin);
+      this.posX[i] = playerX + Math.cos(angle) * dist;
+      this.posZ[i] = playerZ + Math.sin(angle) * dist;
+    }
+    /** 菁英：依機率生成，更大更壯 */
+    const elite = Math.random() < this.eliteChance;
+    this.elite[i] = elite ? 1 : 0;
+    entry.root.scaling.setAll(elite ? 1.7 : 1);
+    /** 依 index 對應的類型血量（pool 交錯排列）；菁英 ×3 */
+    this.hp[i] = ZOMBIE_TYPES[i % ZOMBIE_TYPES.length].hp * HP_SCALE * this.hpMul * (elite ? 3 : 1);
     this.hitFlash[i] = 0;
     this.freezeTimer[i] = 0;
     this.fireTimer[i] = Math.random() * FIRE_INTERVAL;
@@ -176,6 +196,11 @@ export class ZombieHorde {
     entry.root.position.y = this.heightAt(this.posX[i], this.posZ[i]);
     entry.root.setEnabled(true);
     entry.anim?.start(true, 0.8 + Math.random() * 0.4);
+  }
+
+  /** 是否為菁英 */
+  isElite(i: number) {
+    return i < this.count && this.elite[i] === 1;
   }
 
   setCount(next: number, playerX: number, playerZ: number) {
@@ -193,6 +218,9 @@ export class ZombieHorde {
     this.hpMul = 1;
     this.speedMul = 1;
     this.tier = 0;
+    this.eliteChance = 0;
+    this.respawnAtDeath = false;
+    this.lastKillWasElite = false;
     if (!this.ready) {
       this.count = 0;
       return;
@@ -229,7 +257,10 @@ export class ZombieHorde {
     /** 被扣血即觸發受擊白光 */
     this.hitFlash[i] = FLASH_DUR;
     if (this.hp[i] <= 0) {
-      this.spawn(i, playerX, playerZ);
+      this.lastKillWasElite = this.elite[i] === 1;
+      /** 分裂潮：在原地附近復活；否則回外圈 */
+      if (this.respawnAtDeath) this.spawn(i, playerX, playerZ, this.posX[i], this.posZ[i]);
+      else this.spawn(i, playerX, playerZ);
       return true;
     }
     return false;

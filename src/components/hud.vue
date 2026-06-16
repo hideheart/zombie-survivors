@@ -20,6 +20,12 @@
         >
           第 {{ stats.wave }} 波
         </span>
+        <span
+          v-if="stats.mutator"
+          class="rounded-xl bg-fuchsia-500/80 px-2 py-1 font-black backdrop-blur-md sm:px-3"
+        >
+          {{ stats.mutator }}
+        </span>
       </div>
 
       <!-- 血量 -->
