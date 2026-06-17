@@ -1,4 +1,4 @@
--- 動物大逃殺後端 D1 結構（全球排行榜 + 累計統計）
+-- 殭屍大逃殺後端 D1 結構（排行榜 + 統計 + 在線 + 留言）
 -- 套用：wrangler d1 execute animal-survivors-db --file=./schema.sql --remote
 
 CREATE TABLE IF NOT EXISTS runs (
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS stats (
 );
 INSERT OR IGNORE INTO stats (id, plays, total_time, total_kills) VALUES (1, 0, 0, 0);
 
--- 即時在線（心跳）：遊戲進行中每約 20 秒上報一次；online 端點統計近 45 秒活躍人數
+-- 即時在線（心跳）：遊戲進行中每約 60 秒上報一次；online 端點統計近 90 秒活躍人數
 CREATE TABLE IF NOT EXISTS presence (
   device_id TEXT PRIMARY KEY,
   last_seen INTEGER NOT NULL

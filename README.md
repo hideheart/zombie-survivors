@@ -1,6 +1,6 @@
 # 殭屍大逃殺 Zombie Survivors 🧟
 
-3D 倖存者類（Vampire Survivors-like）roguelite。操控一名倖存者（或狗狗、海盜），在無盡殭屍潮中自動開火、撿經驗升級、三選一強化武器，依序擊敗 **7 隻殭屍王**即可破關。低面數美術、跨平台（桌機鍵鼠 + 手機觸控），含 **全球排行榜／在線人數／留言板**（Cloudflare D1 後端，離線自動回退本機）。
+3D 倖存者類（Vampire Survivors-like）roguelite。操控一名倖存者（或狗狗、海盜），在無盡殭屍潮中自動開火、撿經驗升級、三選一強化武器。兩種模式：**劇情模式**依序擊敗 7 隻殭屍王破關、**死鬥模式**無盡波數比誰撐最高。低面數美術、跨平台（桌機鍵鼠 + 手機觸控），含 **全球排行榜／即時在線人數＋歷史圖表／留言板**（Cloudflare D1 後端，離線自動回退本機）。
 
 > 線上試玩：**https://zombie-survivors-e4y.pages.dev**
 > 介紹網站：**https://craig7351.github.io/zombie-survivors/**
@@ -35,8 +35,17 @@
 - 角色**自動**朝最近的殭屍攻擊，玩家只負責**走位**與**升級選擇**。
 - 撿地上的經驗寶石 → 升等 → 從 3 個隨機升級中挑 1 個（每次升級回復 **30% 生命**）。
 - 每 15 秒地圖生成**寶箱**（開啟給 10 秒隨機增益）與**回血道具**。
-- 每 30 秒登場一隻**殭屍王**，各有專屬招式；擊敗第 **7** 隻 → **破關**。
+- **劇情模式**：每 30 秒登場一隻**殭屍王**，各有專屬招式；擊敗第 **7** 隻 → **破關**。
+- **死鬥模式**：無盡波數，怪物隨波越來越強；每 5 波一隻王（Boss Rush），連殺有經驗加成、升級不設上限，撐到死為止比波數。
 - 死亡或破關後依存活時間與擊殺數結算**金幣**，回主選單可解鎖角色與購買永久強化（roguelite meta，存於 localStorage）。
+
+### 💀 死鬥模式機制
+- **波數爬升**：每 30 秒一波，怪物血量／速度／傷害與密度持續上升（第 20 波後更陡）。
+- **每波突變子**（每 3 波隨機）：⚡狂暴／🥚脆皮潮／🗿巨人化／🔥爆裂／🧫分裂潮／💀菁英潮／🧟爬行潮。
+- **菁英怪**：更大更壯、掉更多經驗。
+- **🩸 血潮**：定時 20 秒高密度狂暴時段，畫面轉紅、音樂轉急，撐過給寶箱。
+- **⚖️ 祝福／詛咒**：定時跳出二選一（有得有失，如傷害大增但減傷下降）。
+- **連殺 Combo**：不被打的連殺提升經驗獲取，受擊歸零。
 
 ### 操作
 | | 桌機 | 手機 |
@@ -51,12 +60,14 @@
 移動為**相機相對**（轉動視角後上下左右會跟著畫面走）。
 
 ### 流程與頁面
-- **首頁**：末日風格落地頁（漂浮多邊形背景）。需先輸入暱稱才能開始；顯示**目前遊玩人數**（即時）與本機累積統計（場次／時間／擊殺）。四顆按鈕：▶ 遊戲開始／🏆 排行榜／🧟 怪物圖鑑／💬 留言板。
-- **難度選擇**：按「遊戲開始」後先選 5 種難度之一。
+- **首頁**：末日風格落地頁（漂浮多邊形背景）。需先輸入暱稱才能開始；顯示**目前遊玩人數**（即時）、本機累積統計（場次／時間／擊殺）與**同時在線最高**。五顆按鈕：▶ 遊戲開始／🏆 排行榜／🧟 怪物圖鑑／💬 留言板／📈 線上人數。
+- **模式選擇**：按「遊戲開始」後選 🧟 劇情 或 💀 死鬥。
+- **難度選擇**：再選 5 種難度之一（死鬥模式為起始強度）。
 - **角色選擇**：8 個角色即時 3D 預覽（播 idle、自轉）＋ 詳細介紹；含永久強化商店。
-- **排行榜**：全球排行（Cloudflare D1），可**依難度分頁過濾**；抓不到後端時回退本機前 10 場。
-- **怪物圖鑑**：6 種殭屍 ＋ 7 隻王的模型縮圖與招式說明。
+- **排行榜**：全球排行（Cloudflare D1），分 🧟劇情（破關榜／生存榜）與 💀死鬥（比分數），皆可**依難度分頁過濾**；抓不到後端時回退本機。
+- **怪物圖鑑**：7 種殭屍 ＋ 7 隻王的模型縮圖與招式說明。
 - **留言板**：全球留言（D1），暱稱與排行榜共用。
+- **線上人數**：每小時最高同時在線的歷史長條圖（24 小時／7 天／30 天）。
 
 ---
 
@@ -106,7 +117,7 @@
 | 6 | 巨鯊 | 高速衝咬 |
 | 7 | 深海觸手（最終王） | 深海彈幕（全方位） |
 
-雜兵 6 種：基本殭屍、肋骨怪（快速）、胖殭屍（坦克）、斷臂殭屍、骷髏兵（不死）、無頭骷髏（遠程射手）。
+雜兵 7 種：基本殭屍、肋骨怪（快速）、胖殭屍（坦克）、斷臂殭屍、骷髏兵（不死）、無頭骷髏（遠程射手）、爬行殭屍（趴地爬行）。怪群的移動動作（快跑／擺臂跑／邊跑邊砍／走路）會隨機混搭。
 
 ## 🐕 角色（各有不同起始攻擊）
 | 角色 | 起始攻擊 | 特性 | 解鎖 |
@@ -130,7 +141,7 @@
 - **Vite** + **Tailwind CSS v4**
 - Web Audio 程式合成音效與背景音樂（零音檔）；背景音樂 4 首隨擊敗王數**自動切換**（暗潮→獵殺→肅殺→狂亂）
 - **畫質高／中／低**切換（右上下拉，即時生效）：調整算繪解析度、抗鋸齒、發光、可視距離；不影響玩法數值
-- **後端**：Cloudflare Pages Functions + **D1（SQLite）** 提供全球排行榜／累計統計／在線人數／留言板；同源 `/api`、全部 fail-soft（離線回退本機）
+- **後端**：Cloudflare Pages Functions + **D1（SQLite）** 提供全球排行榜（劇情／死鬥分流＋反作弊）／累計統計／即時在線＋每小時歷史／留言板；同源 `/api`、全部 fail-soft（離線回退本機）
 - 進度／本機排行存於 localStorage；部署於 **Cloudflare Pages**
 
 ### 模型最佳化
@@ -175,6 +186,7 @@ src/
 │  ├─ boss-hazards.ts  # 王招式對玩家的傷害實體（彈幕/震波/毒池）
 │  ├─ upgrades.ts      # RunState 與 25 種升級表
 │  ├─ characters.ts / meta.ts / difficulty.ts  # 8 角色、roguelite meta、5 難度
+│  ├─ deathmatch.ts                      # 死鬥無盡參數、突變子、計分
 │  ├─ leaderboard.ts / api.ts            # 本機排行/統計、後端 API（排行榜/在線/留言）
 │  ├─ terrain.ts / ground-decals.ts      # 地面（柏油材質）、馬路與地面貼片
 │  ├─ effects.ts / sound.ts / decals.ts  # 粒子、音效+背景音樂、血跡
@@ -182,17 +194,17 @@ src/
 │  ├─ quality.ts                         # 畫質（高/中/低）設定
 │  ├─ character-previews.ts / model-thumbs.ts  # 選單即時預覽 / 圖鑑縮圖
 │  └─ model-loader.ts / gem-system.ts / input.ts / config.ts
-├─ components/         # landing / difficulty / leaderboard / bestiary / message-board / menu / hud / game-view / 各 modal
+├─ components/         # landing / mode / difficulty / leaderboard / bestiary / message-board / online-history / menu / hud / game-view / 各 modal
 └─ App.vue
-functions/api/         # Cloudflare Pages Functions：run / leaderboard / stats / heartbeat / online / messages
+functions/api/         # Pages Functions：run / leaderboard / stats / heartbeat / online / online-history / messages
 public/
 ├─ models/zombie/      # Draco 壓縮 .glb 模型（角色、殭屍、武器、道具）
 ├─ draco/              # 自帶 Draco 解碼器
 └─ _redirects          # SPA fallback
-schema.sql             # D1 資料表（runs / stats / presence / messages）
+schema.sql             # D1 資料表（runs / stats / presence / online_hourly / messages）
 docs/                  # 介紹網站（GitHub Pages，/docs）
 ```
-頁面流程：`landing` → `difficulty` → `menu`（角色選擇）→ `game`；另有 `leaderboard`、`bestiary`、`messages` 分頁。
+頁面流程：`landing` → `mode`（模式）→ `difficulty` → `menu`（角色選擇）→ `game`；另有 `leaderboard`、`bestiary`、`messages`、`onlineHistory` 分頁。
 
 ## 🎨 素材
 3D 模型取自第三方低面數模型包（角色、殭屍、武器、場景道具），實際使用的檔案以 Draco 壓縮後放在 `public/models/zombie/`。原始素材包置於 `download/`，已 gitignore、不納入版控。換皮做法詳見 [GAME.md](GAME.md)。
