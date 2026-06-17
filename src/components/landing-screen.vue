@@ -1,6 +1,7 @@
 <template>
   <div class="absolute inset-0 flex flex-col items-center justify-center overflow-hidden text-white">
     <background-polygons />
+    <whats-new-modal v-if="showWhatsNew" :release="latestRelease" @close="closeWhatsNew" />
 
     <div class="relative flex w-full max-w-xs flex-col items-center gap-4 px-6 sm:max-w-none sm:gap-5">
       <!-- 標題 -->
@@ -9,7 +10,7 @@
           class="text-5xl font-black tracking-widest sm:text-7xl"
           style="color: #c6ff7a; paint-order: stroke fill; -webkit-text-stroke: 6px #14210f; text-shadow: 0 6px 0 rgba(0,0,0,0.35)"
         >
-          殭屍大逃殺<span class="ver">{{ version }}</span>
+          殭屍大逃殺<span class="ver" title="查看更新紀錄" @click="openWhatsNew">{{ version }}</span>
         </h1>
         <p class="mt-2 text-xs font-bold tracking-wide text-white/70 sm:mt-3 sm:text-lg">
           在無盡殭屍潮中倖存・3D 倖存者類 roguelite
@@ -86,9 +87,27 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import BackgroundPolygons from './background-polygons.vue';
+import WhatsNewModal from './whats-new-modal.vue';
 import { loadStats, getPlayerName, setPlayerName, type GlobalStats } from '../game/leaderboard';
 import { fetchStats, fetchOnline } from '../game/api';
 import { APP_VERSION as version } from '../version';
+import { CHANGELOG, LATEST_VERSION } from '../changelog';
+
+/** 更新紀錄彈窗：首次（或版本更新後）自動跳一次，看過即記住 */
+const CHANGELOG_KEY = 'animal-survivors:changelogSeen';
+const showWhatsNew = ref(false);
+const latestRelease = CHANGELOG[0];
+function openWhatsNew() {
+  showWhatsNew.value = true;
+}
+function closeWhatsNew() {
+  showWhatsNew.value = false;
+  try {
+    localStorage.setItem(CHANGELOG_KEY, LATEST_VERSION);
+  } catch {
+    /* 忽略寫入失敗 */
+  }
+}
 
 const emit = defineEmits<{
   (e: 'start'): void;
@@ -126,6 +145,8 @@ async function refreshOnline() {
 }
 
 onMounted(async () => {
+  /** 沒看過這個版本的更新紀錄 → 自動跳一次 */
+  if (localStorage.getItem(CHANGELOG_KEY) !== LATEST_VERSION) showWhatsNew.value = true;
   void refreshOnline();
   onlineTimer = window.setInterval(refreshOnline, 60000);
   const global = await fetchStats();
@@ -156,6 +177,10 @@ const timeText = computed(() => {
   color: #c6ff7a;
   opacity: 0.75;
   text-shadow: none;
+  cursor: pointer;
+}
+.ver:hover {
+  opacity: 1;
 }
 .portal-btn {
   padding: 1rem 1.5rem;
