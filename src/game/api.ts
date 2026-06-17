@@ -97,6 +97,8 @@ export interface Message {
   id: number;
   name: string;
   text: string;
+  /** 回覆對象的留言 id；0 為主留言 */
+  parentId: number;
   at: number;
 }
 
@@ -111,14 +113,24 @@ export async function fetchMessages(): Promise<Message[] | null> {
   }
 }
 
-/** 送出一則留言；成功回傳 true */
-export async function postMessage(name: string, text: string): Promise<boolean> {
+/** 送出一則留言或回覆（parentId>0 為回覆）；成功回傳 true */
+export async function postMessage(name: string, text: string, parentId = 0): Promise<boolean> {
   try {
     const res = await fetch(`${BASE}/messages`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, text, deviceId: deviceId() }),
+      body: JSON.stringify({ name, text, parentId, deviceId: deviceId() }),
     });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** 刪除留言（需作者生日 key）；連同回覆一併刪除。成功回傳 true */
+export async function deleteMessage(id: number, key: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE}/messages?id=${id}&key=${encodeURIComponent(key)}`, { method: 'DELETE' });
     return res.ok;
   } catch {
     return false;

@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS messages (
   name TEXT,
   text TEXT,
   device_id TEXT,
+  parent_id INTEGER DEFAULT 0,
   created_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_messages_id ON messages (id DESC);
