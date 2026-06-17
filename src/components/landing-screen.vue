@@ -1,17 +1,18 @@
 <template>
   <div class="absolute inset-0 flex flex-col items-center justify-center overflow-hidden text-white">
     <background-polygons />
+    <div class="pointer-events-none absolute bottom-2 right-3 font-mono text-xs text-white/30">{{ version }}</div>
 
-    <div class="relative flex flex-col items-center gap-8 px-6">
+    <div class="relative flex w-full max-w-xs flex-col items-center gap-4 px-6 sm:max-w-none sm:gap-5">
       <!-- 標題 -->
       <div class="text-center">
         <h1
-          class="text-6xl font-black tracking-widest sm:text-8xl"
+          class="text-5xl font-black tracking-widest sm:text-7xl"
           style="color: #c6ff7a; paint-order: stroke fill; -webkit-text-stroke: 6px #14210f; text-shadow: 0 6px 0 rgba(0,0,0,0.35)"
         >
           殭屍大逃殺
         </h1>
-        <p class="mt-3 text-base font-bold tracking-wide text-white/70 sm:text-lg">
+        <p class="mt-2 text-xs font-bold tracking-wide text-white/70 sm:mt-3 sm:text-lg">
           在無盡殭屍潮中倖存・3D 倖存者類 roguelite
         </p>
         <!-- 即時在線人數 -->
@@ -44,8 +45,8 @@
         <p v-if="!canStart" class="mt-1 text-center text-xs text-rose-300/80">請先輸入暱稱</p>
       </div>
 
-      <!-- 按鈕 -->
-      <div class="flex w-full max-w-xs flex-col gap-4">
+      <!-- 按鈕：主 CTA 整排，其餘 4 顆手機 2×2、桌機回堆疊 -->
+      <div class="flex w-full max-w-xs flex-col gap-3">
         <button
           class="portal-btn portal-btn--play"
           :class="{ 'portal-btn--disabled': !canStart }"
@@ -54,28 +55,30 @@
         >
           ▶ 遊戲開始
         </button>
-        <button class="portal-btn" @click="emit('leaderboard')">🏆 排行榜</button>
-        <button class="portal-btn" @click="emit('bestiary')">🧟 怪物圖鑑</button>
-        <button class="portal-btn" @click="emit('messages')">💬 留言板</button>
-        <button class="portal-btn" @click="emit('onlineHistory')">📈 線上人數</button>
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-1">
+          <button class="portal-btn portal-btn--sub" @click="emit('leaderboard')">🏆 排行榜</button>
+          <button class="portal-btn portal-btn--sub" @click="emit('bestiary')">🧟 圖鑑</button>
+          <button class="portal-btn portal-btn--sub" @click="emit('messages')">💬 留言板</button>
+          <button class="portal-btn portal-btn--sub" @click="emit('onlineHistory')">📈 線上人數</button>
+        </div>
       </div>
 
-      <!-- 累積統計（本機） -->
-      <div class="flex gap-3 sm:gap-6">
-        <div class="rounded-2xl bg-black/30 px-4 py-2 text-center backdrop-blur-md sm:px-6">
-          <div class="text-2xl font-black text-lime-300 sm:text-3xl">{{ stats.plays }}</div>
+      <!-- 累積統計：手機 2×2、桌機橫排 -->
+      <div class="grid w-full max-w-xs grid-cols-2 gap-2 sm:flex sm:w-auto sm:max-w-none sm:gap-6">
+        <div class="rounded-2xl bg-black/30 px-3 py-2 text-center backdrop-blur-md sm:px-6">
+          <div class="text-xl font-black text-lime-300 sm:text-3xl">{{ stats.plays }}</div>
           <div class="text-xs text-white/55">遊玩場次</div>
         </div>
-        <div class="rounded-2xl bg-black/30 px-4 py-2 text-center backdrop-blur-md sm:px-6">
-          <div class="text-2xl font-black text-lime-300 sm:text-3xl">{{ timeText }}</div>
+        <div class="rounded-2xl bg-black/30 px-3 py-2 text-center backdrop-blur-md sm:px-6">
+          <div class="text-xl font-black text-lime-300 sm:text-3xl">{{ timeText }}</div>
           <div class="text-xs text-white/55">累積時間</div>
         </div>
-        <div class="rounded-2xl bg-black/30 px-4 py-2 text-center backdrop-blur-md sm:px-6">
-          <div class="text-2xl font-black text-lime-300 sm:text-3xl">{{ stats.totalKills }}</div>
+        <div class="rounded-2xl bg-black/30 px-3 py-2 text-center backdrop-blur-md sm:px-6">
+          <div class="text-xl font-black text-lime-300 sm:text-3xl">{{ stats.totalKills }}</div>
           <div class="text-xs text-white/55">累積擊殺</div>
         </div>
-        <div class="rounded-2xl bg-black/30 px-4 py-2 text-center backdrop-blur-md sm:px-6">
-          <div class="text-2xl font-black text-lime-300 sm:text-3xl">{{ peak }}</div>
+        <div class="rounded-2xl bg-black/30 px-3 py-2 text-center backdrop-blur-md sm:px-6">
+          <div class="text-xl font-black text-lime-300 sm:text-3xl">{{ peak }}</div>
           <div class="text-xs text-white/55">同時在線最高</div>
         </div>
       </div>
@@ -88,6 +91,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import BackgroundPolygons from './background-polygons.vue';
 import { loadStats, getPlayerName, setPlayerName, type GlobalStats } from '../game/leaderboard';
 import { fetchStats, fetchOnline } from '../game/api';
+import { APP_VERSION as version } from '../version';
 
 const emit = defineEmits<{
   (e: 'start'): void;
@@ -164,6 +168,19 @@ const timeText = computed(() => {
 }
 .portal-btn:active {
   transform: scale(0.97) rotate(-1deg);
+}
+/** 次要按鈕（排行榜/圖鑑/留言板/線上人數）：手機縮小（2×2），桌機回到原本大小堆疊 */
+.portal-btn--sub {
+  padding: 0.6rem 0.5rem;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+}
+@media (min-width: 640px) {
+  .portal-btn--sub {
+    padding: 0.7rem 1.5rem;
+    font-size: 1.35rem;
+    letter-spacing: 0.1em;
+  }
 }
 .portal-btn--play {
   background: linear-gradient(180deg, #7ec850, #4a9c2e);
