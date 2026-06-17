@@ -9,8 +9,8 @@
         <button
           v-for="(c, i) in choices"
           :key="c.id"
-          class="flex flex-col items-center gap-0.5 rounded-xl bg-white/10 p-2 text-center ring-1 ring-white/10 transition hover:bg-white/20 hover:ring-amber-300/60 active:scale-95"
-          @click="emit('choose', i)"
+          class="flex touch-manipulation flex-col items-center gap-0.5 rounded-xl bg-white/10 p-2 text-center ring-1 ring-white/10 transition hover:bg-white/20 hover:ring-amber-300/60 active:scale-95"
+          @pointerdown.prevent="emit('choose', i)"
         >
           <span class="text-2xl sm:text-3xl">{{ c.emoji }}</span>
           <span class="text-xs font-black leading-tight sm:text-sm">{{ c.name }}</span>
