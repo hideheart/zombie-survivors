@@ -2,8 +2,10 @@
   <div class="absolute inset-0 z-20 flex items-center justify-center bg-black/70 backdrop-blur-sm">
     <div class="w-[min(90vw,28rem)] rounded-3xl bg-gradient-to-b from-[#241a36] to-[#1a2236] p-8 text-center text-white shadow-2xl ring-1 ring-amber-300/30">
       <div class="text-2xl">🏆</div>
-      <div class="text-4xl font-black text-amber-300">破關成功！</div>
-      <div class="mt-1 text-sm text-white/70">擊敗全部 {{ stats.bossTotal }} 隻殭屍王</div>
+      <div class="text-4xl font-black text-amber-300">{{ stats.mode === 'deathmatch' ? '死鬥通關！' : '破關成功！' }}</div>
+      <div class="mt-1 text-sm text-white/70">
+        {{ stats.mode === 'deathmatch' ? `撐過 ${stats.wave} 波殭屍潮` : `擊敗全部 ${stats.bossTotal} 隻殭屍王` }}
+      </div>
 
       <div class="my-5 grid grid-cols-3 gap-3">
         <div class="rounded-2xl bg-white/5 p-3">

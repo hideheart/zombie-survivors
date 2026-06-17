@@ -1,7 +1,8 @@
 <template>
   <div class="pointer-events-none absolute inset-0 z-10 select-none">
     <!-- 左上：狀態 -->
-    <div class="absolute top-4 left-4 flex flex-col gap-2 text-white">
+    <!-- 手機：整個資訊區下移到右上控制列下方，才有整排寬度可一列排開；桌機維持 top-4 -->
+    <div class="absolute top-16 left-4 flex flex-col gap-2 text-white sm:top-4">
       <!-- 標題（手機隱藏，避免與按鈕/王血條重疊） -->
       <div class="hidden items-center gap-3 rounded-2xl bg-black/40 px-4 py-2 backdrop-blur-md sm:flex">
         <span class="text-3xl font-black tracking-wider">殭屍大逃殺</span>

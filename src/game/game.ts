@@ -90,6 +90,8 @@ export interface GameStats {
   waveCard: string;
   /** 目前突變子／血潮標籤（死鬥 HUD 顯示，空字串為無） */
   mutator: string;
+  /** 待選升級次數（≥1 時顯示不暫停的升級選項列） */
+  pendingLevels: number;
 }
 
 export interface RunResult {
@@ -335,6 +337,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
   let lastWave = 0;
   let combo = 0;
   let bossRush = 0;
+  /** 待選升級次數（不暫停升級：累積後玩家用選項列逐一挑） */
+  let pendingLevelUps = 0;
   let waveCardText = '';
   let waveCardUntil = 0;
   let curMutator: Mutator | null = null;
@@ -502,6 +506,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     combo: 0,
     waveCard: '',
     mutator: '',
+    pendingLevels: 0,
   };
 
   function pushStats() {
@@ -527,6 +532,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     stats.wave = wave;
     stats.combo = combo;
     stats.waveCard = time < waveCardUntil ? waveCardText : '';
+    stats.pendingLevels = pendingLevelUps;
     stats.mutator = isDM
       ? time < bloodTideUntil
         ? '🩸 血潮來襲'
@@ -546,14 +552,15 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     pushStats();
   }
 
-  function enterLevelUp() {
+  /** 補一組升級選項（不暫停遊戲）；全滿級（劇情）則清空待選 */
+  function rollNextChoices() {
     const rolled = rollChoices(levels, 3, isDM); // 死鬥不設滿級上限
-    if (rolled.length === 0) return; // 全滿級，略過暫停
+    if (rolled.length === 0) {
+      pendingLevelUps = 0;
+      choices = [];
+      return;
+    }
     choices = rolled;
-    state = 'levelup';
-    levelUpBurst(scene, new Vector3(player.position.x, player.position.y + 1, player.position.z));
-    sound.levelUp();
-    pushStats();
   }
 
   /** 死鬥祝福／詛咒：隨機抽 2 個高風險高報酬選項，沿用升級彈窗 */
@@ -642,6 +649,27 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     /** 死鬥：波數推進（每 waveSec 秒一波），進新波時排程 Boss Rush／突變／血潮／祝福 */
     if (isDM) {
       wave = Math.floor(time / DEATHMATCH.waveSec) + 1;
+      /** 撐過通關波數（100）→ 死鬥勝利 */
+      if (wave > DEATHMATCH.clearWave) {
+        wave = DEATHMATCH.clearWave;
+        goldEarned = Math.floor((kills * 0.6 + time) * goldMul) + 1000;
+        state = 'won';
+        sound.levelUp();
+        hazards.reset();
+        pushStats();
+        options.onGameOver?.({
+          gold: goldEarned,
+          kills,
+          time,
+          level,
+          won: true,
+          cheated,
+          mode,
+          wave: DEATHMATCH.clearWave,
+          score: deathmatchScore(DEATHMATCH.clearWave, kills, time),
+        });
+        return;
+      }
       if (wave !== lastWave) {
         lastWave = wave;
         /** 突變子：每 3 波換一個，其餘波清除 */
@@ -834,16 +862,25 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
 
     const collected = gems.update(dt, px, pz, eff.pickupRadius);
     if (collected > 0) {
-      /** 每顆寶石基礎經驗（預設 4）；死鬥連殺給經驗加成（最多 +50%） */
-      const comboXp = isDM ? 1 + Math.min(combo, 50) * 0.01 : 1;
+      /** 每顆寶石基礎經驗（預設 4）；死鬥連殺給經驗加成（最多 +20%） */
+      const comboXp = isDM ? 1 + Math.min(combo, 50) * 0.004 : 1;
       xp += collected * 4 * eff.xpMultiplier * (xpDebug ? 10 : 1) * comboXp;
-      if (xp >= xpToNext) {
+      /** 不暫停升級：累積待選次數，遊戲繼續跑；玩家用畫面下方選項列隨時挑 */
+      let leveled = false;
+      while (xp >= xpToNext) {
         xp -= xpToNext;
         level += 1;
         xpToNext = xpForLevel(level);
-        enterLevelUp();
+        pendingLevelUps += 1;
+        leveled = true;
+      }
+      if (leveled) {
+        levelUpBurst(scene, new Vector3(px, player.position.y + 1, pz));
+        sound.levelUp();
       }
     }
+    /** 有待選但目前無選項（剛開始、或祝福彈窗用掉選項後）→ 補一組（不覆蓋玩家正在看的） */
+    if (choices.length === 0 && pendingLevelUps > 0) rollNextChoices();
 
     /** 接觸傷害（小怪 + 王） */
     let touching = false;
@@ -875,11 +912,12 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
 
     /** 統一結算本幀傷害：接觸（騰空可躲）+ 王招式；套用減傷與護盾 */
     let incoming = 0;
+    const dmLethal = isDM ? dmContactMul(wave) : 1; // 死鬥後期致命性放大（接觸/王/招式）
     if (!airborne) {
       if (touching) incoming += contactDps * dt;
-      if (bossTouch) incoming += boss.contactDps * diff.enemyContact * dt;
+      if (bossTouch) incoming += boss.contactDps * diff.enemyContact * dmLethal * dt;
     }
-    incoming += hazardDmg;
+    incoming += hazardDmg * dmLethal;
     incoming += explodeAccrued; // 爆裂突變傷害
     if (invincible) incoming = 0;
     incoming *= 1 - eff.damageReduction;
@@ -1052,7 +1090,6 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       input.setJoystick(x, z);
     },
     chooseUpgrade(index: number) {
-      if (state !== 'levelup') return;
       const upgrade = choices[index];
       if (!upgrade) return;
       upgrade.apply(run);
@@ -1060,8 +1097,15 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       /** 最大生命升級補滿，其餘升級回復 30% 最大生命 */
       if (upgrade.id === 'maxhp') hp = run.maxHp;
       else hp = Math.min(run.maxHp, hp + run.maxHp * 0.3);
-      choices = [];
-      state = 'running';
+      if (state === 'levelup') {
+        /** 祝福／詛咒（暫停式）：選完恢復遊戲 */
+        choices = [];
+        state = 'running';
+      } else {
+        /** 一般升級（不暫停）：消化一次待選，還有就補下一組 */
+        pendingLevelUps = Math.max(0, pendingLevelUps - 1);
+        choices = pendingLevelUps > 0 ? rollChoices(levels, 3, isDM) : [];
+      }
       pushStats();
     },
     restart() {
@@ -1076,6 +1120,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       goldEarned = 0;
       hurtTimer = 0;
       choices = [];
+      pendingLevelUps = 0;
       state = 'running';
       vy = 0;
       jumpY = 0;

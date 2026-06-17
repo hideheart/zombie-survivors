@@ -19,6 +19,8 @@ export const DEATHMATCH = {
   steepAfterWave: 20,
   /** 轉陡後的額外倍率係數 */
   steepFactor: 0.5,
+  /** 死鬥通關波數：撐過此波數即勝利結算 */
+  clearWave: 100,
 } as const;
 
 /** 每波突變子（隨機掛一個全場效果，效果於 game.ts 套用） */
@@ -53,5 +55,8 @@ export function dmSpeedMul(wave: number): number {
   return 1 + wave * DEATHMATCH.speedPerWave;
 }
 export function dmContactMul(wave: number): number {
-  return 1 + wave * DEATHMATCH.contactPerWave;
+  const base = 1 + wave * DEATHMATCH.contactPerWave;
+  /** 第 20 波後致命性陡升，讓再肥的 build 最終也壓不住（解「站著不動不會死」） */
+  const steep = wave > DEATHMATCH.steepAfterWave ? (wave - DEATHMATCH.steepAfterWave) * 0.15 : 0;
+  return base + steep;
 }

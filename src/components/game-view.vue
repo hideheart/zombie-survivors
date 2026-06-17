@@ -143,10 +143,19 @@
       跳躍
     </button>
 
+    <!-- 祝福／詛咒：暫停式大彈窗（state=levelup） -->
     <level-up-modal
       v-if="stats.state === 'levelup'"
       :level="stats.level"
       :choices="stats.choices"
+      @choose="onChoose"
+    />
+
+    <!-- 一般升級：不暫停的選項列（遊戲進行中且有待選） -->
+    <level-up-bar
+      v-if="stats.state === 'running' && stats.choices.length > 0"
+      :choices="stats.choices"
+      :pending="stats.pendingLevels"
       @choose="onChoose"
     />
 
@@ -191,6 +200,7 @@ import type { Difficulty } from '../game/difficulty';
 import Hud from './hud.vue';
 import Joystick from './joystick.vue';
 import LevelUpModal from './level-up-modal.vue';
+import LevelUpBar from './level-up-bar.vue';
 import GameOverModal from './game-over-modal.vue';
 import VictoryModal from './victory-modal.vue';
 import PauseMenuModal from './pause-menu-modal.vue';
@@ -235,6 +245,7 @@ const stats = reactive<GameStats>({
   combo: 0,
   waveCard: '',
   mutator: '',
+  pendingLevels: 0,
 });
 
 let game: GameHandle | undefined;

@@ -276,6 +276,7 @@ export function rollChoices(levels: Record<string, number>, n = 3, uncapped = fa
 }
 
 /** 升到指定等級所需經驗 */
+/** 升到指定等級所需經驗：加速成長（二次項），避免後期經驗洪流造成連續升級洗版 */
 export function xpForLevel(level: number): number {
-  return 5 + level * 4;
+  return Math.round(5 + level * 4 + level * level * 0.4);
 }

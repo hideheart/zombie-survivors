@@ -1,13 +1,16 @@
 <template>
+  <!-- 外層透明緩衝區：圈圈外一圈也算搖桿地盤，攔截觸控避免落到 canvas 變成轉鏡頭 -->
   <div
-    ref="padRef"
-    class="pad touch-none rounded-full bg-white/15 backdrop-blur-md"
+    ref="zoneRef"
+    class="zone touch-none"
     @pointerdown="onDown"
     @pointermove="onMove"
     @pointerup="onUp"
     @pointercancel="onUp"
   >
-    <div class="thumb" :style="thumbStyle" />
+    <div ref="padRef" class="pad rounded-full bg-white/15 backdrop-blur-md">
+      <div class="thumb" :style="thumbStyle" />
+    </div>
   </div>
 </template>
 
@@ -19,6 +22,7 @@ const emit = defineEmits<{
   (e: 'end'): void;
 }>();
 
+const zoneRef = ref<HTMLElement>();
 const padRef = ref<HTMLElement>();
 const dragging = ref(false);
 const offset = ref({ x: 0, y: 0 });
@@ -49,7 +53,7 @@ function update(clientX: number, clientY: number) {
 
 function onDown(e: PointerEvent) {
   dragging.value = true;
-  padRef.value?.setPointerCapture(e.pointerId);
+  zoneRef.value?.setPointerCapture(e.pointerId);
   update(e.clientX, e.clientY);
 }
 function onMove(e: PointerEvent) {
@@ -64,6 +68,14 @@ function onUp() {
 </script>
 
 <style scoped>
+/** 緩衝區比可見圈大一圈；可見圈靠左下對齊（保持原本位置），緩衝往上、往右延伸 */
+.zone {
+  width: min(13rem, 46vw);
+  height: min(13rem, 46vw);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+}
 .pad {
   width: min(9rem, 32vw);
   height: min(9rem, 32vw);
