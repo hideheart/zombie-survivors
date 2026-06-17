@@ -1,7 +1,6 @@
 <template>
   <div class="absolute inset-0 flex flex-col items-center justify-center overflow-hidden text-white">
     <background-polygons />
-    <div class="pointer-events-none absolute bottom-2 right-3 font-mono text-xs text-white/30">{{ version }}</div>
 
     <div class="relative flex w-full max-w-xs flex-col items-center gap-4 px-6 sm:max-w-none sm:gap-5">
       <!-- 標題 -->
@@ -10,7 +9,7 @@
           class="text-5xl font-black tracking-widest sm:text-7xl"
           style="color: #c6ff7a; paint-order: stroke fill; -webkit-text-stroke: 6px #14210f; text-shadow: 0 6px 0 rgba(0,0,0,0.35)"
         >
-          殭屍大逃殺
+          殭屍大逃殺<span class="ver">{{ version }}</span>
         </h1>
         <p class="mt-2 text-xs font-bold tracking-wide text-white/70 sm:mt-3 sm:text-lg">
           在無盡殭屍潮中倖存・3D 倖存者類 roguelite
@@ -26,8 +25,6 @@
           </span>
           <span class="text-lime-300">{{ online }}</span>
           <span class="text-white/60">人正在遊玩</span>
-          <span v-if="peak > 0" class="text-white/35">·</span>
-          <span v-if="peak > 0" class="text-white/45">最高 {{ peak }}</span>
         </div>
       </div>
 
@@ -148,6 +145,18 @@ const timeText = computed(() => {
 </script>
 
 <style scoped>
+/** 標題後的版本徽章：小、無描邊、淡綠 */
+.ver {
+  font-size: 0.26em;
+  vertical-align: super;
+  margin-left: 0.2em;
+  font-weight: 800;
+  letter-spacing: 0;
+  -webkit-text-stroke: 0;
+  color: #c6ff7a;
+  opacity: 0.75;
+  text-shadow: none;
+}
 .portal-btn {
   padding: 1rem 1.5rem;
   border-radius: 9999px;
