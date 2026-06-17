@@ -13,7 +13,7 @@
           @pointerdown.prevent="emit('choose', i)"
         >
           <span class="text-2xl sm:text-3xl">{{ c.emoji }}</span>
-          <span class="text-xs font-black leading-tight sm:text-sm">{{ c.name }}</span>
+          <span class="text-xs font-black leading-tight text-white sm:text-sm">{{ c.name }}</span>
           <span class="text-[0.62rem] leading-tight text-white">{{ c.desc }}</span>
         </button>
       </div>
