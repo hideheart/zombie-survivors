@@ -42,6 +42,15 @@
           再玩一次
         </button>
       </div>
+
+      <a
+        href="https://www.facebook.com/people/Book-Ai/61584339789020/"
+        target="_blank"
+        rel="noopener"
+        class="mt-3 block rounded-full bg-[#1877f2] px-4 py-2.5 text-center text-sm font-black text-white transition hover:bg-[#3b8bf5] active:scale-95"
+      >
+        👍 加我粉專獲得最新遊戲資訊
+      </a>
     </div>
   </div>
 </template>
