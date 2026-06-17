@@ -141,7 +141,7 @@ async function onSend() {
 }
 
 async function onDelete(id: number) {
-  const key = window.prompt('刪除留言請輸入作者生日（4 碼，例如 0501）');
+  const key = window.prompt('刪除留言請輸入作者生日（4 碼）');
   if (key === null) return;
   const ok = await deleteMessage(id, key.trim());
   if (ok) await refresh();

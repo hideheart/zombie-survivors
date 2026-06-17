@@ -14,7 +14,7 @@
         >
           <span class="text-2xl sm:text-3xl">{{ c.emoji }}</span>
           <span class="text-xs font-black leading-tight sm:text-sm">{{ c.name }}</span>
-          <span class="hidden text-[0.62rem] leading-tight text-white/60 sm:block">{{ c.desc }}</span>
+          <span class="text-[0.62rem] leading-tight text-white">{{ c.desc }}</span>
         </button>
       </div>
     </div>

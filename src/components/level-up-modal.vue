@@ -17,7 +17,7 @@
         >
           <span class="text-5xl">{{ c.emoji }}</span>
           <span class="text-lg font-black">{{ c.name }}</span>
-          <span class="text-sm text-white/70">{{ c.desc }}</span>
+          <span class="text-sm text-white">{{ c.desc }}</span>
         </button>
       </div>
     </div>
