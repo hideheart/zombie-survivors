@@ -20,7 +20,12 @@
 
       <button class="mode-card mode-card--dm" @click="emit('select', 'deathmatch')">
         <div class="text-3xl font-black">💀 死鬥模式</div>
-        <p class="mt-1 text-sm text-white/80">無盡波數，怪物越來越強，撐到死為止。每 5 波一隻王、連殺加成、升級不設上限。比誰撐到最高波。</p>
+        <p class="mt-1 text-sm text-white/80">
+          無盡波數，怪物越來越強，撐到死為止。每 5 波一隻王、每波突變、連殺加成。
+        </p>
+        <p class="mt-1 text-xs text-amber-300/90">
+          ⚑ 等級上限 Lv {{ DEATHMATCH.levelCap }}（戰力封頂）・撐過 {{ DEATHMATCH.clearWave }} 波即通關，比誰撐到最高波。
+        </p>
       </button>
     </div>
   </div>
@@ -29,6 +34,7 @@
 <script setup lang="ts">
 import BackgroundPolygons from './background-polygons.vue';
 import type { GameMode } from '../game/game';
+import { DEATHMATCH } from '../game/deathmatch';
 
 const emit = defineEmits<{ (e: 'select', mode: GameMode): void; (e: 'back'): void }>();
 </script>
