@@ -130,7 +130,7 @@ export async function buildRoads(scene: Scene, heightAt: (x: number, z: number) 
   );
   if (!templates[0]) return;
 
-  const half = CONFIG.arenaHalf * 1.2;
+  const half = CONFIG.arenaHalf * 1.03; // 道路鋪到地板邊緣（與地板尺寸一致）
   const tiles = Math.ceil((half * 2) / TILE);
   const start = -((tiles - 1) * TILE) / 2;
 

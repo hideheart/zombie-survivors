@@ -135,7 +135,7 @@ function asphaltMaterial(scene: Scene): StandardMaterial {
  * 回傳 mesh 與高度查詢函式（兩者用同一函式，保證視覺與貼地一致）。
  */
 export function createTerrain(scene: Scene): { mesh: Mesh; heightAt: (x: number, z: number) => number } {
-  const size = CONFIG.arenaHalf * 2.4;
+  const size = CONFIG.arenaHalf * 2.06; // 地板半徑 ≈ arenaHalf ×1.03，邊界貼近地板邊緣
   const ground = MeshBuilder.CreateGround(
     'ground',
     { width: size, height: size, subdivisions: 120, updatable: true },
