@@ -21,6 +21,8 @@ export const DEATHMATCH = {
   steepFactor: 0.5,
   /** 死鬥通關波數：撐過此波數即勝利結算 */
   clearWave: 100,
+  /** 死鬥等級上限：戰力封頂，怪物無限變強 → 保證 run 會結束、不會無敵 */
+  levelCap: 60,
 } as const;
 
 /** 每波突變子（隨機掛一個全場效果，效果於 game.ts 套用） */

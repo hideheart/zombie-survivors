@@ -862,21 +862,26 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
 
     const collected = gems.update(dt, px, pz, eff.pickupRadius);
     if (collected > 0) {
-      /** 每顆寶石基礎經驗（預設 4）；死鬥連殺給經驗加成（最多 +20%） */
-      const comboXp = isDM ? 1 + Math.min(combo, 50) * 0.004 : 1;
-      xp += collected * 4 * eff.xpMultiplier * (xpDebug ? 10 : 1) * comboXp;
-      /** 不暫停升級：累積待選次數，遊戲繼續跑；玩家用畫面下方選項列隨時挑 */
-      let leveled = false;
-      while (xp >= xpToNext) {
-        xp -= xpToNext;
-        level += 1;
-        xpToNext = xpForLevel(level);
-        pendingLevelUps += 1;
-        leveled = true;
-      }
-      if (leveled) {
-        levelUpBurst(scene, new Vector3(px, player.position.y + 1, pz));
-        sound.levelUp();
+      /** 死鬥等級上限：到頂不再獲得經驗/升級（戰力封頂，怪物續強→run 會結束） */
+      const levelCap = isDM ? DEATHMATCH.levelCap : Infinity;
+      if (level < levelCap) {
+        /** 每顆寶石基礎經驗（預設 4）；死鬥連殺給經驗加成（最多 +20%） */
+        const comboXp = isDM ? 1 + Math.min(combo, 50) * 0.004 : 1;
+        xp += collected * 4 * eff.xpMultiplier * (xpDebug ? 10 : 1) * comboXp;
+        /** 不暫停升級：累積待選次數，遊戲繼續跑；玩家用畫面下方選項列隨時挑 */
+        let leveled = false;
+        while (xp >= xpToNext && level < levelCap) {
+          xp -= xpToNext;
+          level += 1;
+          xpToNext = xpForLevel(level);
+          pendingLevelUps += 1;
+          leveled = true;
+        }
+        if (leveled) {
+          levelUpBurst(scene, new Vector3(px, player.position.y + 1, pz));
+          sound.levelUp();
+        }
+        if (level >= levelCap) xp = xpToNext; // 滿等：經驗條顯示全滿
       }
     }
     /** 有待選但目前無選項（剛開始、或祝福彈窗用掉選項後）→ 補一組（不覆蓋玩家正在看的） */
