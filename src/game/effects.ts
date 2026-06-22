@@ -97,13 +97,20 @@ export function enemyDeathBurst(scene: Scene, pos: Vector3) {
 
 /** 飄字（增益名稱、回血量）：billboard 文字向上飄並淡出 */
 export function spawnText(scene: Scene, pos: Vector3, text: string, colorHex: string, scale = 1) {
-  const width = 512;
+  const font = '900 72px sans-serif';
+  // 建立暫時的 canvas 測量字元實際像素寬度
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d')!;
+  tempCtx.font = font;
+  const textWidth = Math.ceil(tempCtx.measureText(text).width * 1.15) + 100; // 增加寬度緩衝，防止在不同系統與瀏覽器下因字型渲染差異而產生切邊
   const height = 128;
+  const width = Math.max(256, textWidth); // 至少 256 寬度
+
   const texture = new DynamicTexture('text', { width, height }, scene, false);
   texture.hasAlpha = true;
   const ctx = texture.getContext() as unknown as CanvasRenderingContext2D;
   ctx.clearRect(0, 0, width, height);
-  ctx.font = '900 72px sans-serif';
+  ctx.font = font;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineWidth = 9;
@@ -113,7 +120,9 @@ export function spawnText(scene: Scene, pos: Vector3, text: string, colorHex: st
   ctx.fillText(text, width / 2, height / 2);
   texture.update();
 
-  const plane = MeshBuilder.CreatePlane('text-plane', { width: 4 * scale, height: 1 * scale }, scene);
+  // 根據量測出的寬高比，動態調整 Plane 的寬度
+  const planeWidth = (width / height) * scale;
+  const plane = MeshBuilder.CreatePlane('text-plane', { width: planeWidth, height: 1 * scale }, scene);
   plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
   plane.isPickable = false;
   plane.position = new Vector3(pos.x, pos.y + 2.5, pos.z);

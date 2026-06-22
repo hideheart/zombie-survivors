@@ -20,6 +20,7 @@
     @buy="onBuy"
     @unlock="onUnlock"
     @add-gold="onAddGold"
+    @reset-talents="onResetTalents"
     @home="screen = 'landing'"
   />
   <game-view
@@ -30,6 +31,9 @@
     :gold-multiplier="goldMul"
     :difficulty="difficulty"
     :mode="gameMode"
+    :on-global-xp-gain="onGlobalXpGain"
+    :global-lvl="meta.globalLvl"
+    :global-xp="meta.globalXp"
     @gameover="onGameOver"
     @menu="screen = 'landing'"
   />
@@ -46,7 +50,7 @@ import DifficultyScreen from './components/difficulty-screen.vue';
 import MessageBoardScreen from './components/message-board-screen.vue';
 import OnlineHistoryScreen from './components/online-history-screen.vue';
 import ModeScreen from './components/mode-screen.vue';
-import { loadMeta, saveMeta, computeStartRunState, goldMultiplier, PERMA, permaCost } from './game/meta';
+import { loadMeta, saveMeta, computeStartRunState, goldMultiplier, PERMA, permaCost, checkLevelUp } from './game/meta';
 import { getCharacter } from './game/characters';
 import { addRecord, recordStats, getPlayerName } from './game/leaderboard';
 import { getDifficulty, type Difficulty } from './game/difficulty';
@@ -89,9 +93,30 @@ function onStart(charId: string) {
   screen.value = 'game';
 }
 
+let lastSaveTime = 0;
+function saveMetaThrottled() {
+  const now = Date.now();
+  if (now - lastSaveTime > 3000) {
+    saveMeta(meta);
+    lastSaveTime = now;
+  }
+}
+
+function onGlobalXpGain(amount: number, _reason: 'kill' | 'time' | 'level'): boolean {
+  meta.globalXp += amount;
+  const leveledUp = checkLevelUp(meta);
+  if (leveledUp) {
+    saveMeta(meta);
+  } else {
+    saveMetaThrottled();
+  }
+  return leveledUp;
+}
+
 function onGameOver(result: RunResult) {
   meta.gold += result.gold;
-  saveMeta(meta);
+  saveMeta(meta); // 遊戲結束強制存檔一次
+  
   const playerName = getPlayerName() || '倖存者';
   const character = getCharacter(lastCharId).name;
   const diffId = difficulty.value.id;
@@ -135,10 +160,25 @@ function onBuy(permaId: string) {
   if (!p) return;
   const lvl = meta.perma[permaId] ?? 0;
   if (lvl >= p.maxLevel) return;
-  const c = permaCost(p, lvl);
-  if (meta.gold < c) return;
-  meta.gold -= c;
+
+  // 檢查前置天賦相依性
+  if (p.dependsOn) {
+    const parentLvl = meta.perma[p.dependsOn] ?? 0;
+    if (parentLvl < 1) {
+      return; // 前置天賦未點亮，無法解鎖進階天賦
+    }
+  }
+
+  const cost = permaCost(p, lvl);
+  if (meta.skillPoints < cost) return;
+  meta.skillPoints -= cost;
   meta.perma[permaId] = lvl + 1;
+  saveMeta(meta);
+}
+
+function onResetTalents() {
+  meta.perma = {};
+  meta.skillPoints = meta.globalLvl - 1; // 1 等時獲得 0 點技能點，每升 1 等加 1 點
   saveMeta(meta);
 }
 

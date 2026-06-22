@@ -212,6 +212,9 @@ const props = defineProps<{
   goldMultiplier: number;
   difficulty?: Difficulty;
   mode?: GameMode;
+  onGlobalXpGain?: (amount: number, reason: 'kill' | 'time' | 'level') => boolean;
+  globalLvl?: number;
+  globalXp?: number;
 }>();
 const emit = defineEmits<{
   (e: 'gameover', result: RunResult): void;
@@ -246,6 +249,8 @@ const stats = reactive<GameStats>({
   waveCard: '',
   mutator: '',
   pendingLevels: 0,
+  globalLvl: props.globalLvl ?? 1,
+  globalXp: props.globalXp ?? 0,
 });
 
 let game: GameHandle | undefined;
@@ -284,11 +289,14 @@ onMounted(() => {
     difficulty: props.difficulty,
     quality: quality.value,
     mode: props.mode,
+    globalLvl: props.globalLvl,
+    globalXp: props.globalXp,
     onStats: (s) => {
       Object.assign(stats, s);
       if (showStats.value && game) upgradeStatus.value = game.getUpgradeStatus();
     },
     onGameOver: (r) => emit('gameover', r),
+    onGlobalXpGain: props.onGlobalXpGain,
   });
   game.setMuted(muted.value);
 
@@ -339,7 +347,7 @@ function onToggleDebug() {
   if (!showDebug.value) {
     const answer = window.prompt('請問作者的全名（三個字）？');
     if (answer === null) return;
-    if (answer.trim() !== '黃國書') {
+    if (answer.trim() !== 'click') {
       window.alert('答錯了，無法開啟 Debug');
       return;
     }

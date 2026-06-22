@@ -46,6 +46,7 @@ import { Obstacle, resolveObstacles } from './obstacles';
 import { createRunState, rollChoices, xpForLevel, UPGRADES, type RunState, type Upgrade } from './upgrades';
 import { levelUpBurst, bossDeathBurst, hurtBurst, enemyDeathBurst, spawnText, setGlowLayer } from './effects';
 import { sound } from './sound';
+import { POE_XP_TABLE } from './meta';
 
 export type GameState = 'running' | 'levelup' | 'dead' | 'paused' | 'won';
 
@@ -92,6 +93,8 @@ export interface GameStats {
   mutator: string;
   /** 待選升級次數（≥1 時顯示不暫停的升級選項列） */
   pendingLevels: number;
+  globalLvl: number;
+  globalXp: number;
 }
 
 export interface RunResult {
@@ -114,6 +117,7 @@ export interface RunResult {
 export interface GameOptions {
   onStats?: (stats: GameStats) => void;
   onGameOver?: (result: RunResult) => void;
+  onGlobalXpGain?: (amount: number, reason: 'kill' | 'time' | 'level') => boolean;
   /** 角色與永久升級算出的起始數值（範本，每輪複製使用） */
   startRunState?: RunState;
   /** 角色身體顏色（fallback 造型用） */
@@ -128,6 +132,8 @@ export interface GameOptions {
   quality?: QualityId;
   /** 遊戲模式：story（劇情/破關）或 deathmatch（無盡死鬥） */
   mode?: GameMode;
+  globalLvl?: number;
+  globalXp?: number;
 }
 
 export interface GameHandle {
@@ -317,6 +323,9 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     }
   });
   let bossTimer = 0;
+  let timeXpAccum = 0;
+  let globalLvl = options.globalLvl ?? 1;
+  let globalXp = options.globalXp ?? 0;
   /** 已生成的王數（最多 BOSS_COUNT） */
   let bossCount = 0;
   /** 已擊敗的王數 */
@@ -507,7 +516,24 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     waveCard: '',
     mutator: '',
     pendingLevels: 0,
+    globalLvl: globalLvl,
+    globalXp: globalXp,
   };
+
+  function gainGlobalXp(amount: number, reason: 'kill' | 'time' | 'level') {
+    if (cheated) return;
+    globalXp += amount;
+    let leveledUp = false;
+    while (globalLvl < 100 && globalXp >= POE_XP_TABLE[globalLvl]) {
+      globalLvl++;
+      leveledUp = true;
+    }
+    options.onGlobalXpGain?.(amount, reason);
+    if (leveledUp) {
+      spawnText(scene, player.position, '⭐ 全域等級提升！可用天賦點 +1', '#f59e0b', 5);
+      sound.levelUp();
+    }
+  }
 
   function pushStats() {
     stats.fps = Math.round(engine.getFps());
@@ -533,6 +559,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     stats.combo = combo;
     stats.waveCard = time < waveCardUntil ? waveCardText : '';
     stats.pendingLevels = pendingLevelUps;
+    stats.globalLvl = globalLvl;
+    stats.globalXp = globalXp;
     stats.mutator = isDM
       ? time < bloodTideUntil
         ? '🩸 血潮來襲'
@@ -790,6 +818,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
       /** 吸血：先累積，稍後封頂結算 */
       if (eff.lifestealOnKill > 0) lifestealAccrued += eff.lifestealOnKill;
       combo += 1; // 連殺（受擊歸零）
+      gainGlobalXp(25, 'kill');
       /** 菁英擊殺：額外噴經驗 + 較大爆裂 */
       if (enemies.lastKillWasElite) {
         for (let n = 0; n < 3; n++) gems.spawn(x + (Math.random() - 0.5) * 1.6, z + (Math.random() - 0.5) * 1.6);
@@ -876,6 +905,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
           xpToNext = xpForLevel(level);
           pendingLevelUps += 1;
           leveled = true;
+          gainGlobalXp(200, 'level');
         }
         if (leveled) {
           levelUpBurst(scene, new Vector3(px, player.position.y + 1, pz));
@@ -969,6 +999,15 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions = {})
     }
 
     time += dt;
+    
+    if (!cheated) {
+      timeXpAccum += dt;
+      if (timeXpAccum >= 1.0) {
+        const sec = Math.floor(timeXpAccum);
+        timeXpAccum -= sec;
+        gainGlobalXp(sec * 10, 'time');
+      }
+    }
   }
 
   let throttle = 0;

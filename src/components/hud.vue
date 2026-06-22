@@ -52,6 +52,19 @@
           />
         </div>
       </div>
+
+      <!-- 全域等級與經驗 -->
+      <div class="flex items-center gap-2 mt-0.5">
+        <span class="rounded-lg bg-gradient-to-r from-cyan-500 to-indigo-500 px-2 py-0.5 text-[0.68rem] font-black text-white shadow-sm">
+          帳號 Lv {{ stats.globalLvl || 1 }}
+        </span>
+        <div class="h-2 w-28 overflow-hidden rounded-full bg-black/40 backdrop-blur-md sm:w-36">
+          <div
+            class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-indigo-500 transition-all duration-500 ease-out"
+            :style="{ width: globalXpPercent + '%' }"
+          />
+        </div>
+      </div>
     </div>
 
     <!-- 王血條 -->
@@ -82,6 +95,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { GameStats } from '../game/game';
+import { POE_XP_TABLE } from '../game/meta';
 
 const props = defineProps<{ stats: GameStats }>();
 
@@ -95,6 +109,16 @@ const hpPercent = computed(() =>
 const xpPercent = computed(() =>
   props.stats.xpToNext > 0 ? Math.min(100, (props.stats.xp / props.stats.xpToNext) * 100) : 0,
 );
+const globalXpPercent = computed(() => {
+  const lvl = props.stats.globalLvl ?? 1;
+  const xp = props.stats.globalXp ?? 0;
+  if (lvl >= 100) return 100;
+  const minXp = POE_XP_TABLE[lvl - 1];
+  const maxXp = POE_XP_TABLE[lvl];
+  const range = maxXp - minXp;
+  if (range <= 0) return 0;
+  return Math.min(100, Math.max(0, ((xp - minXp) / range) * 100));
+});
 const timeText = computed(() => {
   const total = Math.floor(props.stats.time);
   const m = Math.floor(total / 60);
